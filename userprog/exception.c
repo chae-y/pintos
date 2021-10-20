@@ -146,6 +146,8 @@ page_fault (struct intr_frame *f) {
 		return;
 #endif
 
+	exit(-1);
+
 	/* Count page faults. */
 	page_fault_cnt++;
 
@@ -158,7 +160,7 @@ page_fault (struct intr_frame *f) {
 
 	/* child-bad test가 rsp의 위피를 바꾸는데 page fault는 projcet 3에서 다루므로*/
 	/* 일단 exit을 통해 pass를 시킨다       */
-	//kill (f);
-	exit(-1);
+	kill (f);
+	// exit(-1);
 }
 

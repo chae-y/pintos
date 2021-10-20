@@ -2,6 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include "lib/kernel/hash.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -43,9 +44,13 @@ struct thread;
 struct page {
 	const struct page_operations *operations;
 	void *va;              /* Address in terms of user space */
-	struct frame *frame;   /* Back reference for frame */
+	struct frame *frame;   /* Back reference for frame */ // page frame
 
 	/* Your implementation */
+
+	// Project 3.1_memory management
+	bool writable;	/* True일경우해당주소에write 가능 False일경우해당주소에write 불가능*/
+	struct hash_elem hash_elem;	// 해시 테이블 element
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -63,13 +68,18 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	// Project 3.1_memory management
+	struct list_elem frame_elem;
+	// Project 3.1_end
 };
 
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.
  * Put the table of "method" into the struct's member, and
  * call it whenever you needed. */
+// class inheritance concept of Object-Oriented_programming by function pointer
 struct page_operations {
+	// 3개의 function pointers
 	bool (*swap_in) (struct page *, void *);
 	bool (*swap_out) (struct page *);
 	void (*destroy) (struct page *);
@@ -85,6 +95,9 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	// project3.1_memory management
+	struct hash pages;
+	// project3.1_end
 };
 
 #include "threads/thread.h"
@@ -109,4 +122,13 @@ void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
 
+// Project 3.1_memory management
+unsigned
+page_hash (const struct hash_elem *p_, void *aux UNUSED);
+bool
+page_less (const struct hash_elem *a_,
+           const struct hash_elem *b_, void *aux UNUSED);
+bool insert_page(struct hash *pages, struct page *p);
+// Project 3.2_anonymous page
+void spt_destructor(struct hash_elem *e, void* aux);
 #endif  /* VM_VM_H */

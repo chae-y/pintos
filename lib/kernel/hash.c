@@ -19,7 +19,7 @@ static void insert_elem (struct hash *, struct list *, struct hash_elem *);
 static void remove_elem (struct hash *, struct hash_elem *);
 static void rehash (struct hash *);
 
-/* Initializes hash table H to compute hash values using HASH and
+/* Initializes hash table  to compute hash values using HASH and
    compare hash elements using LESS, given auxiliary data AUX. */
 bool
 hash_init (struct hash *h,

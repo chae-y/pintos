@@ -67,7 +67,9 @@ initd (void *f_name) {
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
-
+	// Project 3.1_memory management
+	process_init();
+	// Project 3.1_end
 	if (process_exec (f_name) < 0)
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
@@ -267,6 +269,11 @@ process_exec (void *f_name) {
 
 	/* We first kill the current conxtext */
 	process_cleanup ();
+	// Project 3.1_memory management
+	#ifdef VM
+	supplemental_page_table_init(&thread_current()->spt);
+	#endif
+	// Project 3.1_end
 	
 	/* And then load the binary */
 	success = load (file_name, &_if);
@@ -430,7 +437,7 @@ struct ELF64_PHDR {
 #define ELF ELF64_hdr
 #define Phdr ELF64_PHDR
 
-static bool setup_stack (struct intr_frame *if_);
+bool setup_stack (struct intr_frame *if_);
 static bool validate_segment (const struct Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
@@ -448,7 +455,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
-
 	char *token, *save_ptr;
 	char *argv[64];
 	int argc = 0;
@@ -460,13 +466,11 @@ load (const char *file_name, struct intr_frame *if_) {
 		argv[argc] = token;
 		argc++;
 	}
-
 	/* Allocate and activate page directory. */
-	t->pml4 = pml4_create ();
+	t->pml4 = pml4_create (); // kernel_pool
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
-
 	/* Open executable file. */
 	file = filesys_open (argv[0]);
 	if (file == NULL) {
@@ -486,7 +490,6 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: error loading executable\n", argv[0]);
 		goto done;
 	}
-
 	/* Read program headers. */
 	file_ofs = ehdr.e_phoff;
 	for (i = 0; i < ehdr.e_phnum; i++) {
@@ -671,7 +674,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a minimal stack by mapping a zeroed page at the USER_STACK */
-static bool
+bool
 setup_stack (struct intr_frame *if_) {
 	uint8_t *kpage;
 	bool success = false;
@@ -710,12 +713,56 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
+// Project 3.1_memory management
+bool
+install_page (void *upage, void *kpage, bool writable){
+	struct thread *t = thread_current ();
+
+	return (pml4_get_page (t->pml4, upage)== NULL
+			&& pml4_set_page (t->pml4, upage, kpage, writable));
+}
+// Project 3.1_end
+
+
+// Project 3.2_anonymous page
+bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+    //! ADD: lazy_load_segment
+    //! 이게 맞나?; aux[0]을 *file로 casting하고 싶어서, 참조 가능한 이중 void 포인터로((void **)aux) 먼저 캐스팅
+	// TODO : page 구조체 member로 넣어놓은 것들 불러오기
+
+    struct file *file = ((struct box *)aux)->file;
+	off_t ofs = ((struct box*)aux)->ofs;
+    size_t page_read_bytes = ((struct box *)aux)->page_read_bytes;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+    /* Get a page of memory. */
+
+    /* Load this page. */
+
+	file_seek (file, ofs);
+
+    if (file_read (file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
+        palloc_free_page (page->frame->kva);
+        return false;
+    }
+	// printf("여기서 터지나요??\n");
+    // printf("lazy load file file pos :: %d\n", file->pos);
+    memset (page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+    // /* Add the page to the process's address space. */
+
+    // printf("here??\n");
+    // printf("upage-va :: %p\n", page->va);
+    // hex_dump(page->va, page->va, PGSIZE, true);
+    // free(aux);
+    return true;
+    //! END: insert of lazy_load_segment
 }
+
+// Project 3.2_end
 
 /* Loads a segment starting at offset OFS in FILE at address
  * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
@@ -745,22 +792,31 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
-			return false;
+		// TODO: Set up aux to pass information to the lazy_load_segment. */
+        //! ADD: aux modified
 
+        struct box *box = (struct box*)malloc(sizeof(struct box));
+
+        box->file = file;
+        box->ofs = ofs;
+        box->page_read_bytes = page_read_bytes;
+
+		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
+					writable, lazy_load_segment, box))
+			return false;
+		// free(box);
+		// hex_dump(page->va, page->va, PGSIZE, true);
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+        //! ADD : ofs 이동시켜야 함
+		ofs += page_read_bytes;
 	}
 	return true;
 }
-
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
-static bool
+bool
 setup_stack (struct intr_frame *if_) {
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
@@ -769,6 +825,17 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+	// Project 3.2_anonymous page
+	if(vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1))
+	{
+		success = vm_claim_page(stack_bottom);
+
+		if(success){
+			if_->rsp = USER_STACK;
+			thread_current()->stack_bottom = stack_bottom;
+		}
+	}
+	//project 3.2_end
 
 	return success;
 }
@@ -812,8 +879,6 @@ void argument_stack(char **argv, int argc, struct intr_frame *if_)
 	rsp -= 8;
 	memset(rsp, 0, sizeof(char*));
 	if_->rsp = rsp;
-
-	
 
 	/* Debugging */	
 	//printf ("Hey! This is your stack!\n\n\n\n\n\n\n\n");
