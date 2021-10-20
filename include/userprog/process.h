@@ -18,13 +18,13 @@ bool install_page (void *upage, void *kpage, bool writable);
 bool setup_stack (struct intr_frame *if_);
 static bool lazy_load_segment (struct page *page, void *aux);
 
-struct box {
-    struct file *file;
-    // uint8_t* upage;
-    off_t ofs;
-    size_t page_read_bytes;
-    // bool writable;
-};
-// Project 3.2_end
+// struct box {
+//     struct file *file;
+//     // uint8_t* upage;
+//     off_t ofs;
+//     size_t page_read_bytes;
+//     // bool writable;
+// };
+// // Project 3.2_end
 
 #endif /* userprog/process.h */

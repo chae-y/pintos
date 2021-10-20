@@ -730,39 +730,38 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
-    //! ADD: lazy_load_segment
     //! 이게 맞나?; aux[0]을 *file로 casting하고 싶어서, 참조 가능한 이중 void 포인터로((void **)aux) 먼저 캐스팅
 	// TODO : page 구조체 member로 넣어놓은 것들 불러오기
 
-    struct file *file = ((struct box *)aux)->file;
-	off_t ofs = ((struct box*)aux)->ofs;
-    size_t page_read_bytes = ((struct box *)aux)->page_read_bytes;
-    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+    // struct file *file = ((struct box *)aux)->file;
+	// off_t ofs = ((struct box*)aux)->ofs;
+    // size_t page_read_bytes = ((struct box *)aux)->page_read_bytes;
+    // size_t page_zero_bytes = PGSIZE - page_read_bytes;
+	struct load_info* li = (struct load_info *) aux;
+	if (page == NULL) return false;
 
-    /* Get a page of memory. */
-
-    /* Load this page. */
-
-	file_seek (file, ofs);
-
-    if (file_read (file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
-        palloc_free_page (page->frame->kva);
-        return false;
-    }
-	// printf("여기서 터지나요??\n");
-    // printf("lazy load file file pos :: %d\n", file->pos);
-    memset (page->frame->kva + page_read_bytes, 0, page_zero_bytes);
-    // /* Add the page to the process's address space. */
-
-    // printf("here??\n");
-    // printf("upage-va :: %p\n", page->va);
+    
+    // if (file_read (file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
+    //     palloc_free_page (page->frame->kva);
+    //     return false;
+    // }
+	/* Load this page. */
+	if(li->page_read_bytes > 0){
+		file_seek (li->file, li->ofs);
+		if (file_read (li->file, page->frame->kva, li->page_read_bytes) != (int) li->page_read_bytes) {
+			vm_dealloc_page (page);
+			free(li);
+			return false;
+			}
+	}
+    // memset (page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+	memset (page->va + li->page_read_bytes, 0, li->page_zero_bytes);
     // hex_dump(page->va, page->va, PGSIZE, true);
-    // free(aux);
+    file_close(li->file);
+	free(li);
     return true;
-    //! END: insert of lazy_load_segment
+    //Project 3.2_end
 }
-
-// Project 3.2_end
 
 /* Loads a segment starting at offset OFS in FILE at address
  * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
@@ -778,6 +777,7 @@ lazy_load_segment (struct page *page, void *aux) {
  *
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
+// Project 3.1_anonymous page
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
@@ -785,6 +785,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	off_t read_ofs = ofs;
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -795,15 +796,23 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		// TODO: Set up aux to pass information to the lazy_load_segment. */
         //! ADD: aux modified
 
-        struct box *box = (struct box*)malloc(sizeof(struct box));
+        // struct box *box = (struct box*)malloc(sizeof(struct box));
 
-        box->file = file;
-        box->ofs = ofs;
-        box->page_read_bytes = page_read_bytes;
+        // box->file = file;
+        // box->ofs = ofs;
+        // box->page_read_bytes = page_read_bytes;
 
+		struct load_info *aux = malloc (sizeof(struct load_info));
+		aux->file = file_reopen(file);
+		aux->ofs = read_ofs;
+		aux->page_read_bytes = page_read_bytes;
+		aux->page_zero_bytes = page_zero_bytes;
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, box))
+					writable, lazy_load_segment, (void*)aux)){
+			free(aux);
 			return false;
+		}
+			
 		// free(box);
 		// hex_dump(page->va, page->va, PGSIZE, true);
 		/* Advance. */
@@ -811,10 +820,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
         //! ADD : ofs 이동시켜야 함
-		ofs += page_read_bytes;
+		read_ofs += PGSIZE;
 	}
 	return true;
 }
+// Project 3.1_end
+
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 bool
 setup_stack (struct intr_frame *if_) {

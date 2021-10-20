@@ -131,4 +131,11 @@ page_less (const struct hash_elem *a_,
 bool insert_page(struct hash *pages, struct page *p);
 // Project 3.2_anonymous page
 void spt_destructor(struct hash_elem *e, void* aux);
+struct load_info{
+	struct file *file;
+	off_t ofs;
+	size_t page_read_bytes;
+	size_t page_zero_bytes;
+};
+
 #endif  /* VM_VM_H */
