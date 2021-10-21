@@ -26,6 +26,8 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &file_ops;
 
 	struct file_page *file_page = &page->file;
+
+	return true;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -41,6 +43,7 @@ file_backed_swap_out (struct page *page) {
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
+//페이지 삭제 루틴 시작(안바꿔도 되는 듯?)
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;

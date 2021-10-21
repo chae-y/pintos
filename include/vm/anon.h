@@ -5,6 +5,8 @@ struct page;
 enum vm_type;
 
 struct anon_page {
+    //project 10
+    int swqp_index;
 };
 
 void vm_anon_init (void);

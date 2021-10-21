@@ -267,6 +267,11 @@ process_exec (void *f_name) {
 
 	/* We first kill the current conxtext */
 	process_cleanup ();
+
+	//project 9
+	#ifdef VM
+	supplemental_page_table_init(&thread_current()->spt);
+	#endif
 	
 	/* And then load the binary */
 	success = load (file_name, &_if);
@@ -430,7 +435,7 @@ struct ELF64_PHDR {
 #define ELF ELF64_hdr
 #define Phdr ELF64_PHDR
 
-static bool setup_stack (struct intr_frame *if_);
+bool setup_stack (struct intr_frame *if_);
 static bool validate_segment (const struct Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
@@ -671,7 +676,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a minimal stack by mapping a zeroed page at the USER_STACK */
-static bool
+bool
 setup_stack (struct intr_frame *if_) {
 	uint8_t *kpage;
 	bool success = false;
@@ -710,11 +715,46 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
+//project 9
+bool
+install_page (void *upage, void *kpage, bool writable) {
+	struct thread *t = thread_current ();
+
+	/* Verify that there's not already a page at that virtual
+	 * address, then map our page there. */
+	return (pml4_get_page (t->pml4, upage) == NULL
+			&& pml4_set_page (t->pml4, upage, kpage, writable));
+}
+
+
+//project 10
+/*이 함수는 실행 파일의 페이지에 대한 이니셜라이져이며 페이지 폴트시 호출됩니다.
+페이지 구조체와 aux를 인수로 받습니다
+aux는 load_segment에서 설정한 정보입니다
+이 정보를 사용하여 세그먼트를 읽을 파일을 찾고 결국 세그먼트를 메모리로 읽어야합니다.*/
 static bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+
+	//아니 이럴거면 그냥 하나씩 보내는게 낫지 않나 왜 합쳐서 보낼까
+	struct file *file = ((struct box *)aux)->file;
+	off_t ofs = ((struct box*)aux)->ofs;
+    size_t page_read_bytes = ((struct box *)aux)->page_read_bytes;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+	//load this page
+	file_seek (file, ofs);
+
+	if (file_read (file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
+        palloc_free_page (page->frame->kva);
+        return false;
+    }
+
+	memset (page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -731,6 +771,11 @@ lazy_load_segment (struct page *page, void *aux) {
  *
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
+//project 10
+/*현재 코드는 파일에서 읽을 바이트 수와 메인 루프내에서 0으로 채울 바이트 수를 계산합니다.
+	그런다음 vm_alloc_page_with_initilizer를 호출하여 보류중인 개체를 만듦
+	vm_alloc_page_with_initializer에 제공할 aux인수로 보조값을 설정해야합니다.
+	바이너리 로드에 필요한 정보를 포함하는 구조를 생성할 수 있습니다.*/
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
@@ -738,6 +783,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	//루프를 돌 떄 마다 vm_alloc_page_with_initializer를 호출하여 보류중인 페이지 개체를 만듦
+	//페이지 폴트가 발생하면 파일에서 세그먼트가 실제로 로드되는 경우임
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -746,21 +793,35 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
+		struct box *box = (struct box*)malloc(sizeof(struct box));
+		box->file = file;
+		box->ofs = ofs;
+		box->page_read_bytes = page_read_bytes;
+
+
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, box))
 			return false;
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+
+		ofs += page_read_bytes;//왜 이동하는지 잘 모르겠으
 	}
 	return true;
 }
 
+
+//project 10
+/*새로운 메모리 관리 시스템에 스택 할당을 맞추기 위해 setup_stack을 조정해야합니다.
+첫번째 스택 페이지는 지연 할당될 필요가 없습니다.
+요류가 발생할 때까지 기다릴 필요 없이 뢔드시 명령줄 인수를 사용하여 이를 할당하고 초기화 할 수 있습니다.
+스태긍 식별하는 방법을 제공해야할 수 도 있습니다.
+vm_type에 있는 보조 마커를 사용하여 페이지를 표시 할 수 있습니다.*/
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
-static bool
+bool
 setup_stack (struct intr_frame *if_) {
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
@@ -769,7 +830,14 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)){
+		success = vm_claim_page(stack_bottom);
+		
+		if (success){
+			if_->rsp = USER_STACK;
+            // thread_current()->stack_bottom = stack_bottom;
+		}
+	}
 	return success;
 }
 #endif /* VM */

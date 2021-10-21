@@ -137,11 +137,14 @@ struct thread
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
-	uint64_t *pml4; /* Page map level 4 */
+	uint64_t *pml4; /* Page map level 4 */ //메모리의 가상 및 물리적 매핑을 관리하는 페이지 테이블
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	//project 10
+	void* rsp_stack;		//! stack grow 할 때 사용
+    void* stack_bottom;
 #endif
 
 	/* Owned by thread.c. */

@@ -27,6 +27,7 @@ enum vm_type {
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
+#include "lib/kernel/hash.h"
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
@@ -44,6 +45,11 @@ struct page {
 	const struct page_operations *operations;
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
+
+	//project 9
+	struct hash_elem hash_elem;
+	bool writable;		/* True일경우해당주소에write 가능 False일경우해당주소에write 불가능*/
+	bool is_loaded;     /* 물리메모리의탑재여부를알려주는플래그*/
 
 	/* Your implementation */
 
@@ -63,6 +69,9 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+
+	//project 9
+	struct list_elem frame_elem;
 };
 
 /* The function table for page operations.
@@ -84,7 +93,10 @@ struct page_operations {
 /* Representation of current process's memory space.
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
+//vm entry
 struct supplemental_page_table {
+	//project 9
+	struct hash pages;
 };
 
 #include "threads/thread.h"
@@ -108,5 +120,8 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
+
+//project 10
+void spt_destructor(struct hash_elem *e, void* aux);
 
 #endif  /* VM_VM_H */
