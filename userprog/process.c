@@ -705,7 +705,7 @@ install_page (void *upage, void *kpage, bool writable) {
 
 	/* Verify that there's not already a page at that virtual
 	 * address, then map our page there. */
-	return (pml4_get_page (t->pml4, upage) == NULL
+	return (pml4_get_page (t->pml4, upage) == NULL //  
 			&& pml4_set_page (t->pml4, upage, kpage, writable));
 }
 #else
@@ -820,7 +820,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
         //! ADD : ofs 이동시켜야 함
-		read_ofs += PGSIZE;
+		// read_ofs += PGSIZE;
+		read_ofs += page_read_bytes;
 	}
 	return true;
 }

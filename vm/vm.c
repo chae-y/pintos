@@ -87,13 +87,11 @@ bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writabl
 
         //! page member 초기화
         page->writable = writable;
-        // printf("page의 va :: %p\n", page->frame);
         // hex_dump(page->va, page->va, PGSIZE, true);
 
         /* TODO: Insert the page into the spt. */
-        // printf("AFTER if PPPPPPPPPPP22222222222222 %d\n", pml4_is_dirty(&thread_current()->pml4, page->va));
         return spt_insert_page(spt, page);
-        //! END: uninit_new
+		// Project
     }
 err:
     return false;
@@ -183,6 +181,20 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	// Project 3.3_stack growth
+	void *stack_bottom = pg_round_down (addr);
+	size_t req_stack_size = USER_STACK - (uintptr_t)stack_bottom;
+	if (req_stack_size > (1 << 20)) PANIC("Stack limit exceeded!\n"); // 1MB
+
+	//Alloc page from tested region to previous claimed stack page.
+	void *growing_stack_bottom = stack_bottom;
+	while ((uintptr_t) growing_stack_bottom < USER_STACK &&
+		vm_alloc_page (VM_ANON | VM_MARKER_0, growing_stack_bottom, true)) { // VM_MARKER_0 스탐은 STACK으로 함
+		growing_stack_bottom += PGSIZE;
+	};
+	vm_claim_page(stack_bottom); // Lazy load requested stack page only
+
+	// Project 3.3_end
 }
 
 /* Handle the fault on write_protected page */
@@ -193,28 +205,27 @@ vm_handle_wp (struct page *page UNUSED) {
 /* Return true on success */
 // page fault 발생시 핸들링을 위해 호출 되는 함수
 bool
-vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
-		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr,
+		bool user, bool write, bool not_present) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	// struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 
 	// Project 3.1_memory management
-	if(is_kernel_vaddr(addr))
-	{
-		return false;
-	}
+	if(is_kernel_vaddr(addr)) return false;
 
 	void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
 	if (not_present){
 		if(!vm_claim_page(addr))
 		{
-			if(rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK)
-			{
-				vm_stack_growth(thread_current()->stack_bottom - PGSIZE);
-				return true;
-			}
+			// Project 3.3_stack grow
+			// if(rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK)
+			// {
+			// 	vm_stack_growth(thread_current()->stack_bottom - PGSIZE);
+			// 	return true;
+			// }
+			// Project 3.3_end
 			return false;
 		}
 		else
@@ -239,11 +250,9 @@ bool
 vm_claim_page (void *va UNUSED) {
 	// struct page *page = NULL;
 	struct page *page;
-	/* TODO: Fill this function */
 	// Project 3.1_memory management
 	page = spt_find_page(&thread_current()->spt, va);
-	if (page == NULL)
-		return false;
+	if (page == NULL) return false;
 	// Project 3.1_end
 	return vm_do_claim_page (page);
 }
