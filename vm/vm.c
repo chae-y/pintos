@@ -43,7 +43,7 @@ page_get_type (struct page *page) {
 		case VM_UNINIT:
 			return VM_TYPE (page->uninit.type);
 		default:
-			return ty;
+			return ty; 
 	}
 }
 
