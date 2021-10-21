@@ -40,7 +40,7 @@ enum vm_type
 page_get_type (struct page *page) { 
 	int ty = VM_TYPE (page->operations->type);
 	switch (ty) {
-		case VM_UNINIT:
+		case VM_UNINIT: 
 			return VM_TYPE (page->uninit.type);
 		default:
 			return ty; 
