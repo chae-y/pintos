@@ -28,8 +28,8 @@ vm_anon_init (void) {
 	/* TODO: Set up the swap_disk. */
 	
 	swap_disk = disk_get(1, 1);
-	size_t swap_size = disk_size(swap_disk) / SECTORS_PER_PAGE;
-	swap_table = bitmap_create(swap_size);
+  size_t swap_size = disk_size(swap_disk) / SECTORS_PER_PAGE;
+  swap_table = bitmap_create(swap_size);
 }
 
 /* Initialize the file mapping */
