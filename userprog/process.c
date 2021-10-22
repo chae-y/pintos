@@ -705,8 +705,8 @@ install_page (void *upage, void *kpage, bool writable) {
 
 	/* Verify that there's not already a page at that virtual
 	 * address, then map our page there. */
-	return (pml4_get_page (t->pml4, upage) == NULL //  
-			&& pml4_set_page (t->pml4, upage, kpage, writable));
+	return (pml4_get_page (t->pml4, upage) == NULL // VA이용 -> PA 확인 잇 kva, 없 NULL
+			&& pml4_set_page (t->pml4, upage, kpage, writable)); // pml4의 UPAGE(V) to PF(KPAGE에 의해 확인된)
 }
 #else
 /* From here, codes will be used after project 3.
@@ -748,7 +748,7 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* Load this page. */
 	if(li->page_read_bytes > 0){
 		file_seek (li->file, li->ofs);
-		if (file_read (li->file, page->frame->kva, li->page_read_bytes) != (int) li->page_read_bytes) {
+		if (file_read (li->file, page->frame->kva, li->page_read_bytes) != (int) li->page_read_bytes) { // fil의
 			vm_dealloc_page (page);
 			free(li);
 			return false;

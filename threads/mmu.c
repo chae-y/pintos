@@ -15,7 +15,7 @@ pgdir_walk (uint64_t *pdp, const uint64_t va, int create) {
 		uint64_t *pte = (uint64_t *) pdp[idx];
 		if (!((uint64_t) pte & PTE_P)) {
 			if (create) {
-				uint64_t *new_page = palloc_get_page (PAL_ZERO);
+				uint64_t *new_page = palloc_get_page (PAL_ZERO); // kernel 영역 할당
 				if (new_page)
 					pdp[idx] = vtop (new_page) | PTE_U | PTE_W | PTE_P;
 				else
@@ -23,7 +23,7 @@ pgdir_walk (uint64_t *pdp, const uint64_t va, int create) {
 			} else
 				return NULL;
 		}
-		return (uint64_t *) ptov (PTE_ADDR (pdp[idx]) + 8 * PTX (va));
+		return (uint64_t *) ptov (PTE_ADDR (pdp[idx]) + 8 * PTX (va)); // frame 물리 주소 return
 	}
 	return NULL;
 }
@@ -79,7 +79,7 @@ pml4e_walk (uint64_t *pml4e, const uint64_t va, int create) {
 			} else
 				return NULL;
 		}
-		pte = pdpe_walk (ptov (PTE_ADDR (pml4e[idx])), va, create);
+		pte = pdpe_walk (ptov (PTE_ADDR (pml4e[idx])), va, create); // frame 물리 주소 return
 	}
 	if (pte == NULL && allocated) {
 		palloc_free_page ((void *) ptov (PTE_ADDR (pml4e[idx])));
@@ -214,10 +214,10 @@ void *
 pml4_get_page (uint64_t *pml4, const void *uaddr) {
 	ASSERT (is_user_vaddr (uaddr));
 
-	uint64_t *pte = pml4e_walk (pml4, (uint64_t) uaddr, 0);
+	uint64_t *pte = pml4e_walk (pml4, (uint64_t) uaddr, 0); // PA 찾음
 
 	if (pte && (*pte & PTE_P))
-		return ptov (PTE_ADDR (*pte)) + pg_ofs (uaddr);
+		return ptov (PTE_ADDR (*pte)) + pg_ofs (uaddr); // PA to KVA로 변환하여 return
 	return NULL;
 }
 
@@ -236,10 +236,11 @@ pml4_set_page (uint64_t *pml4, void *upage, void *kpage, bool rw) {
 	ASSERT (is_user_vaddr (upage));
 	ASSERT (pml4 != base_pml4);
 
-	uint64_t *pte = pml4e_walk (pml4, (uint64_t) upage, 1);
+	uint64_t *pte = pml4e_walk (pml4, (uint64_t) upage, 1); // 마지막 argu 1이면 create !
 
 	if (pte)
-		*pte = vtop (kpage) | PTE_P | (rw ? PTE_W : 0) | PTE_U;
+		// vtop (kpage) : kva에 해당하는 physical frame 포인터를 PA로 변환
+		*pte = vtop (kpage) | PTE_P | (rw ? PTE_W : 0) | PTE_U; 
 	return pte != NULL;
 }
 

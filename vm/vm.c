@@ -82,8 +82,7 @@ bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writabl
                 break;
         }
         
-        // printf("PPPPPPPPPPP22222222222222\n");
-        uninit_new(page, upage, init, type, aux, initializer);
+        uninit_new(page, upage, init, type, aux, initializer); // file 정보를 page 구조체에 저장
 
         //! page member 초기화
         page->writable = writable;
@@ -107,10 +106,10 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	/* TODO: Fill this function. */
 	struct hash_elem *e;
 
-	page->va = pg_round_down(va);
+	page->va = pg_round_down(va); // offset 없애고 va를 가진 page의 시작을 가리킴
 	e = hash_find(&spt->pages, &page->hash_elem);
 	free(page);
-	return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL;
+	return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL; // page 반환
 	// return page;
 	// Project 3.1_end
 }
@@ -164,12 +163,12 @@ vm_get_frame (void) {
 	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
 	/* TODO: Fill this function. */
 	frame->kva = palloc_get_page(PAL_USER);
-	if(frame->kva == NULL)
-	{
-		frame = vm_evict_frame();
-		frame->page = NULL;
-		return frame;
-	}
+	// if(frame->kva == NULL)
+	// {
+	// 	frame = vm_evict_frame();
+	// 	frame->page = NULL;
+	// 	return frame;
+	// }
 	list_push_back(&frame_table, &frame->frame_elem);
 	frame->page = NULL;
 
@@ -182,17 +181,17 @@ vm_get_frame (void) {
 static void
 vm_stack_growth (void *addr UNUSED) {
 	// Project 3.3_stack growth
-	void *stack_bottom = pg_round_down (addr);
-	size_t req_stack_size = USER_STACK - (uintptr_t)stack_bottom;
-	if (req_stack_size > (1 << 20)) PANIC("Stack limit exceeded!\n"); // 1MB
+	// void *stack_bottom = pg_round_down (addr);
+	// size_t req_stack_size = USER_STACK - (uintptr_t)stack_bottom;
+	// if (req_stack_size > (1 << 20)) PANIC("Stack limit exceeded!\n"); // 1MB
 
-	//Alloc page from tested region to previous claimed stack page.
-	void *growing_stack_bottom = stack_bottom;
-	while ((uintptr_t) growing_stack_bottom < USER_STACK &&
-		vm_alloc_page (VM_ANON | VM_MARKER_0, growing_stack_bottom, true)) { // VM_MARKER_0 스탐은 STACK으로 함
-		growing_stack_bottom += PGSIZE;
-	};
-	vm_claim_page(stack_bottom); // Lazy load requested stack page only
+	// //Alloc page from tested region to previous claimed stack page.
+	// void *growing_stack_bottom = stack_bottom;
+	// while ((uintptr_t) growing_stack_bottom < USER_STACK &&
+	// 	vm_alloc_page (VM_ANON | VM_MARKER_0, growing_stack_bottom, true)) { // VM_MARKER_0 스탐은 STACK으로 함
+	// 	growing_stack_bottom += PGSIZE;
+	// };
+	// vm_claim_page(stack_bottom); // Lazy load requested stack page only
 
 	// Project 3.3_end
 }
@@ -215,7 +214,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr,
 	// Project 3.1_memory management
 	if(is_kernel_vaddr(addr)) return false;
 
-	void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
+	// void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
 	if (not_present){
 		if(!vm_claim_page(addr))
 		{
@@ -251,15 +250,17 @@ vm_claim_page (void *va UNUSED) {
 	// struct page *page = NULL;
 	struct page *page;
 	// Project 3.1_memory management
-	page = spt_find_page(&thread_current()->spt, va);
+	page = spt_find_page(&thread_current()->spt, va); // spt에서 va에 해당하는 page structrue 존재하는지 확인
 	if (page == NULL) return false;
 	// Project 3.1_end
 	return vm_do_claim_page (page);
 }
 
 /* Claim the PAGE and set up the mmu. */
+// frame 얻고 VA to PA mapping
 static bool
-vm_do_claim_page (struct page *page) {
+vm_do_claim_page (struct page *page) { // 페이지 요청 // claim : allocate a physical frame
+
 	struct frame *frame = vm_get_frame ();
 
 	/* Set links */
@@ -268,7 +269,7 @@ vm_do_claim_page (struct page *page) {
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 
-	if(install_page(page->va, frame->kva, page->writable))
+	if(install_page(page->va, frame->kva, page->writable)) // add mapping from VA to PA. pml4 table에 주소만 mapping
 	{
 		return swap_in(page, frame->kva);
 	}
@@ -289,7 +290,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 							  struct supplemental_page_table *src UNUSED) {
 	// Project 3.2_anonymous page
 	struct hash_iterator i;
-	hash_first(&i, &src->pages);
+	hash_first(&i, &src->pages); // src->pages : struct hash
 	while(hash_next(&i))
 	{
 		
@@ -301,11 +302,11 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		vm_initializer *init = parent_page->uninit.init;
 		void* aux = parent_page->uninit.aux;
 
-		if(parent_page->uninit.type & VM_MARKER_0)
-		{
-			setup_stack(&thread_current()->tf);
-		}
-		else if(parent_page->operations->type == VM_UNINIT)
+		// if(parent_page->uninit.type & VM_MARKER_0)
+		// {
+		// 	setup_stack(&thread_current()->tf);
+		// }
+		/*else*/if(parent_page->operations->type == VM_UNINIT)
 		{
 			if(!vm_alloc_page_with_initializer(type, upage, writable, init, aux))
 				return false;
@@ -320,7 +321,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		if(parent_page->operations->type != VM_UNINIT)
 		{
 			struct page* child_page = spt_find_page(dst,upage);
-			memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
+			memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE); // copy
 		}
 	}
 	return true;

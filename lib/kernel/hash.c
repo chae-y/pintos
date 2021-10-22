@@ -188,7 +188,8 @@ hash_first (struct hash_iterator *i, struct hash *h) {
 
 	i->hash = h;
 	i->bucket = i->hash->buckets;
-	i->elem = list_elem_to_hash_elem (list_head (i->bucket));
+	i->elem = list_elem_to_hash_elem (list_head (i->bucket)); // hash_cur
+	// bucket : list. head : list_elem. 
 }
 
 /* Advances I to the next element in the hash table and returns

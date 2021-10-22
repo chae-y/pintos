@@ -79,7 +79,7 @@ struct frame {
  * call it whenever you needed. */
 // class inheritance concept of Object-Oriented_programming by function pointer
 struct page_operations {
-	// 3개의 function pointers
+	// 3개의 function pointers. 객체 지향 프로그래밍의 상속 개념. 함수를 포인터로 callinggkaus 컴파일러가 적절한 루틴을 실행
 	bool (*swap_in) (struct page *, void *);
 	bool (*swap_out) (struct page *);
 	void (*destroy) (struct page *);
