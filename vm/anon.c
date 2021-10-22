@@ -3,7 +3,7 @@
 #include "vm/vm.h"
 #include "devices/disk.h"
 #include "threads/vaddr.h"
-#include "bitmap.h"
+#include <bitmap.h>
 
 /* DO NOT MODIFY BELOW LINE */
 static struct disk *swap_disk;
@@ -27,7 +27,7 @@ const size_t SECTORS_PER_PAGE = PGSIZE / DISK_SECTOR_SIZE; // 2^12 / 512
 /* Initialize the data for anonymous pages */
 //anon페이지 하위시스템에대해 초기화 합니다. 이 함수에서 anon페이지와 관련된 모든것을 설정 할 수 있습니다.
 void
-vm_anon_init (void) { // 여기가 어렵구먼 ....?ㅇㅅㅇ  잘 모르겠넼ㅋㅋ
+vm_anon_init (void) { 
 	/* TODO: Set up the swap_disk. */
 	swap_disk = disk_get(1, 1);
 	size_t swap_size = disk_size(swap_disk) / SECTORS_PER_PAGE;
@@ -62,7 +62,16 @@ anon_swap_out (struct page *page) {
 }
 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
+//anonymous 페이지가 보유한 리소스를 해제합니다.
+//페이지 구조를 명시적으로 해제할 필요는 없으며 호출자가 수행해야합니다.
 static void
 anon_destroy (struct page *page) {
-	struct anon_page *anon_page = &page->anon;
+	if(page->frame != NULL){
+		list_remove(&page->frame->frame_elem);
+		free(page->frame);
+	}else{
+		struct anon_page *anon_page = &page->anon;
+		// ASSERT(anon_page->swap_slot_idx != INVALID_SLOT_IDX);
+		// bitmap_set(swap_table, anon_page->swap_slot_idx, false);
+	}
 }

@@ -59,6 +59,7 @@ static struct frame *vm_evict_frame (void);
 //unitit페이지의 swap in 핸들러는 자동으로 페이지를 타입에 따라 초기화하고, 주어진 aus롤 init를 호출한다.
 //페이지 구조가 있으면 페이지를 프로세스의 보조 페이지 테이블에 삽입하시오.
 //vm.h에 정의된 vm_type매크로를 사용하면 편리함
+//여기서는 페이지 만들고 앞에 do_claim어쩌구에는 프레임 만들고
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
@@ -231,7 +232,7 @@ vm_dealloc_page (struct page *page) {
 
 //project 9
 //va에 할당하도록 주장
-//먼저 페이지를 얻고 페이지와함꼐 vm do claim page호출
+//먼저 페이지를 찾아서 얻고 페이지와함꼐 vm do claim page호출
 /* Claim the page that allocate on VA. */
 bool
 vm_claim_page (void *va UNUSED) {
@@ -244,7 +245,7 @@ vm_claim_page (void *va UNUSED) {
 	return vm_do_claim_page (page);
 }
 
-//projrct 9
+//project 9
 //물리적 프레임인 페이지를 할당하는 것을 의미
 //vm_get_frame을 먼저 호출하여 프레임을 얻는다 그런다음 mmu설정
 //즉, 가상주소에서 페이지 테이블의 실제 주소에 매핑을 추가합니다.
@@ -281,33 +282,33 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 }
 
 //project 10
+/*src에서 dst로 보조 페이지 테이블을 복사합니다.
+이것은 자식이 부모의 실행 컨텍스트를 상속해야 할 때 사용됩니다(ex. fork)
+src의 추가 페이지 테이블에 있는 각 페이지를 반복하고 dst의 추가 페이지 테이블에 있는 항목의 정확한 복사본을 만듦니다
+unitit페이지를 할당하고 즉시 요청해야합니다*/
 /* Copy supplemental page table from src to dst */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
-	//! ADD: supplemental_page_table_copy
     // bool success;
     struct hash_iterator i;
     hash_first (&i, &src->pages);
     while (hash_next (&i))
     {
-        // struct page *parent_page = (struct page*)malloc(sizeof(struct page));
         struct page *parent_page = hash_entry (hash_cur (&i), struct page, hash_elem);
 
-        // printf("copy 스레드 이름 :: %s\n", thread_name());
-        // enum vm_type type = parent_page->operations->type;
         enum vm_type type = page_get_type(parent_page);
         void *upage = parent_page->va;
         bool writable = parent_page->writable;
         vm_initializer *init = parent_page->uninit.init;
         void* aux = parent_page->uninit.aux;
 
-        if (parent_page->uninit.type & VM_MARKER_0)
+        if (parent_page->uninit.type & VM_MARKER_0)//스택이면
         {
             setup_stack(&thread_current()->tf);
         }
 
-        else if(parent_page->operations->type == VM_UNINIT)
+        else if(parent_page->operations->type == VM_UNINIT)//unitit타입이면
         {
             if(!vm_alloc_page_with_initializer(type, upage, writable, init, aux))
                 return false;
@@ -334,6 +335,11 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 }
 
 //project 10
+/*supplemental_page_table이 보유한 모든 리소스를 해제합니다.
+이함수는 프로세스가 종료될 때 호출됩니다.
+페이지 항목을 반복하고 테이블의 페이지에 대해 destroy를 호출해야합니다 
+이함수에서 실제 페이지 테이블(pml4)과 물리적 메모리(palloced memory)에 대해 걱정할 필요가 없습니다.
+호출자는 추가 페이지 테이블이 정리된 후 이를 정리합니다.*/
 /* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
@@ -346,11 +352,11 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
     {
         struct page *page = hash_entry (hash_cur (&i), struct page, hash_elem);
 
-        if (page->operations->type == VM_FILE)
-        {
-            do_munmap(page->va);
-            // destroy(page);
-        }
+        // if (page->operations->type == VM_FILE)
+        // {
+        //     do_munmap(page->va);
+        //     // destroy(page);
+        // }
         // free(page);
     }
     hash_destroy(&spt->pages, spt_destructor);
@@ -362,7 +368,7 @@ bool page_hash(const struct hash_elem *p_, void *aux UNUSED){
 	return hash_bytes(&p->va, sizeof p->va);
 }
 
-//projgect 9
+//project 9
 bool page_less(const struct hash_elem *a, const struct hash_elem *b, void *aux UNUSED){
 	const struct page *a_page = hash_entry(a, struct page, hash_elem);
 	const struct page *b_page = hash_entry(b, struct page, hash_elem);

@@ -745,8 +745,10 @@ lazy_load_segment (struct page *page, void *aux) {
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 	//load this page
+	//ofs 업데이트
 	file_seek (file, ofs);
 
+	//load가 되는 것?
 	if (file_read (file, page->frame->kva, page_read_bytes) != (int) page_read_bytes) {
         palloc_free_page (page->frame->kva);
         return false;
@@ -771,7 +773,6 @@ lazy_load_segment (struct page *page, void *aux) {
  *
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
-//project 10
 /*현재 코드는 파일에서 읽을 바이트 수와 메인 루프내에서 0으로 채울 바이트 수를 계산합니다.
 	그런다음 vm_alloc_page_with_initilizer를 호출하여 보류중인 개체를 만듦
 	vm_alloc_page_with_initializer에 제공할 aux인수로 보조값을 설정해야합니다.
@@ -808,6 +809,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
 
+		//project 10
 		ofs += page_read_bytes;//왜 이동하는지 잘 모르겠으
 	}
 	return true;
@@ -817,8 +819,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 //project 10
 /*새로운 메모리 관리 시스템에 스택 할당을 맞추기 위해 setup_stack을 조정해야합니다.
 첫번째 스택 페이지는 지연 할당될 필요가 없습니다.
-요류가 발생할 때까지 기다릴 필요 없이 뢔드시 명령줄 인수를 사용하여 이를 할당하고 초기화 할 수 있습니다.
-스태긍 식별하는 방법을 제공해야할 수 도 있습니다.
+오류가 발생할 때까지 기다릴 필요 없이 로드시 명령줄 인수를 사용하여 이를 할당하고 초기화 할 수 있습니다.
+스택은 식별하는 방법을 제공해야할 수 도 있습니다.
 vm_type에 있는 보조 마커를 사용하여 페이지를 표시 할 수 있습니다.*/
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 bool

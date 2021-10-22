@@ -43,7 +43,7 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 }
 
 /* Initalize the page on first fault */
-//첫번째 오류에서 페이지르르 초기화 합니다.
+//첫번째 오류에서 페이지를 초기화 합니다.
 //템플릿 코드는 먼저 vm_initializer 및 aux를 가져오고 함수 포인터를 통해 해당 page_initialzer를 호출합니다.
 static bool
 uninit_initialize (struct page *page, void *kva) {
@@ -62,10 +62,13 @@ uninit_initialize (struct page *page, void *kva) {
  * to other page objects, it is possible to have uninit pages when the process
  * exit, which are never referenced during the execution.
  * PAGE will be freed by the caller. */
+//페이지 구조가 보유한 리소스를 해제합니다.
+//페이지의 vm유형을 확인하고 그에따라 처리할 수 있습니다.
 static void
 uninit_destroy (struct page *page) {
-	struct uninit_page *uninit UNUSED = &page->uninit;
+	// struct uninit_page *uninit UNUSED = &page->uninit;
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
+	if (page->uninit.aux != NULL) free (page->uninit.aux);
 	return;
 }

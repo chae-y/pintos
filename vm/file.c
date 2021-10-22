@@ -6,6 +6,9 @@ static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
 static void file_backed_destroy (struct page *page);
 
+//project 10
+static struct list mmap_file_list;
+
 /* DO NOT MODIFY this struct */
 static const struct page_operations file_ops = {
 	.swap_in = file_backed_swap_in,
@@ -55,7 +58,22 @@ do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
 }
 
+//project 10
 /* Do the munmap */
 void
 do_munmap (void *addr) {
+	// if (list_empty (&mmap_file_list)) return;
+	// for (struct list_elem* i = list_front (&mmap_file_list); i != list_end (&mmap_file_list); i = list_next (i))
+	// {
+	// 	struct mmap_file_info* mfi = list_entry (i, struct mmap_file_info, elem);
+	// 	if (mfi -> start == (uint64_t) addr){
+	// 		for (uint64_t j = (uint64_t)addr; j<= mfi -> end; j += PGSIZE){
+	// 			struct page* page = spt_find_page(&thread_current() -> spt, (void*) j);
+	// 			spt_remove_page(&thread_current()->spt, page);
+	// 		}
+	// 		list_remove(&mfi->elem);
+	// 		free(mfi);
+	// 		return;
+	// 	}
+	// }
 }
