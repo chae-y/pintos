@@ -16,6 +16,11 @@ bool install_page (void *upage, void *kpage, bool writable);
 struct thread *get_child_with_pid(int pid);
 
 
+bool install_page (void *upage, void *kpage, bool writable);
+bool setup_stack (struct intr_frame *if_);
+bool lazy_load_segment (struct page *page, void *aux);
+
+
 struct box {
   struct file *file;
 

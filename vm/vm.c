@@ -50,6 +50,8 @@ page_get_type (struct page *page) {
 static struct frame *vm_get_victim (void);
 static bool vm_do_claim_page (struct page *page);
 static struct frame *vm_evict_frame (void);
+void spt_destructor(struct hash_elem *e, void* aux);
+
 
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
@@ -253,7 +255,44 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 /* Copy supplemental page table from src to dst */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+		struct supplemental_page_table *src UNUSED) 
+{
+	struct hash_iterator i;
+	hash_first(&i, &src->pages);
+	while(hash_next (&i))
+	{
+    struct page *parent_page = hash_entry (hash_cur (&i), struct page, hash_elem);
+
+		enum vm_type type = page_get_type(parent_page);
+		void *upage = parent_page -> va;
+		bool writable = parent_page -> writable;
+		vm_initializer *init = parent_page -> uninit.init;
+		void* aux = parent_page -> uninit.aux;
+
+		if (parent_page->uninit.type & VM_MARKER_0)
+		{
+			setup_stack(&thread_current()->tf);
+		}
+		else if(parent_page->operations->type == VM_UNINIT)
+		{
+			if (!vm_alloc_page_with_initializer(type, upage, writable, init, aux))
+				return false;
+		}
+		else{
+			if (!vm_alloc_page(type, upage, writable))
+				return false;
+			if (!vm_claim_page(upage))
+				return false;
+		}
+
+		if (parent_page->operations->type != VM_UNINIT)
+		{
+			struct page* child_page = spt_find_page(dst, upage);
+			memcpy(child_page->frame->kva, parent_page->frame->kva, PGSIZE);
+		}
+	}
+
+	return true;
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -261,6 +300,22 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+
+	struct hash_iterator i;
+
+  hash_first (&i, &spt->pages);
+  while (hash_next (&i))
+  {
+      struct page *page = hash_entry (hash_cur (&i), struct page, hash_elem);
+
+      if (page->operations->type == VM_FILE)
+      {
+          do_munmap(page->va);
+            // destroy(page);
+      }
+        // free(page);
+  }
+  hash_destroy(&spt->pages, spt_destructor);
 }
 
 // 보류
@@ -287,4 +342,11 @@ bool insert_page(struct hash *pages, struct page *p)
         return true;
     else
         return false;
+}
+
+void spt_destructor(struct hash_elem *e, void* aux)
+{
+	const struct page *p = hash_entry(e, struct page, hash_elem);
+
+	free(p);
 }
