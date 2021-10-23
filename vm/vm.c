@@ -173,7 +173,7 @@ vm_evict_frame (void) {
 //페이지 할당 오류가 발생 할 경우 현재 스왑을 처리할 필요가 없다
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = palloc_get_page(sizeof(struct frame));
+	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
 	/* TODO: Fill this function. */
 
 	frame->kva = palloc_get_page(PAL_USER);
@@ -194,8 +194,16 @@ vm_get_frame (void) {
 }
 
 /* Growing the stack. */
+//project 11
+//하나 혹은 그 이상의 anonymos page를 할당해서 stack size를 증가시킨다.
+//그러면 addr은 더이상 faulted address가 아니다
+//allocation 할 떄 addr를 PG_ROUND_DOWN해야하는 걸 잊지 마라
 static void
 vm_stack_growth (void *addr UNUSED) {
+	if(vm_alloc_page(VM_ANON | VM_MARKER_0, addr, 1)){
+		vm_claim_page(addr);
+		thread_current()->stack_bottom -= PGSIZE;
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -203,20 +211,31 @@ static bool
 vm_handle_wp (struct page *page UNUSED) {
 }
 
+//project 10
 /* Return true on success */
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
-	struct page *page = NULL;
+	// struct page *page = NULL;
 
 	if(is_kernel_vaddr(addr))
     {
         return false;
     }
 
+	//project 11 잘 모르겠넿ㅎㅎㅎ
+	void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
 	if (not_present){
-        return vm_claim_page(addr);
+        if(!vm_claim_page(addr)){
+			if(rsp_stack-8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK){//stack grow할 공간있으면
+				vm_stack_growth(thread_current()->stack_bottom - PGSIZE);
+				return true;
+			}
+			return false;
+		}else{
+			return true;
+		}
     }
     
     return false;
@@ -352,11 +371,11 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
     {
         struct page *page = hash_entry (hash_cur (&i), struct page, hash_elem);
 
-        // if (page->operations->type == VM_FILE)
-        // {
-        //     do_munmap(page->va);
-        //     // destroy(page);
-        // }
+        if (page->operations->type == VM_FILE)
+        {
+            // do_munmap(page->va);
+            destroy(page);
+        }
         // free(page);
     }
     hash_destroy(&spt->pages, spt_destructor);

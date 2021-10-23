@@ -36,6 +36,9 @@ void close (int fd);
 
 int dup2(int oldfd, int newfd);
 
+//project 12
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap (void *addr);
 
 int process_add_file (struct file *);
 struct file *process_get_file (int);
@@ -77,7 +80,7 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 
-	//project 10
+	//project 11
 	#ifdef VM
     thread_current()->rsp_stack = f->rsp;
     #endif
@@ -129,6 +132,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	case SYS_DUP2:
 		f->R.rax = dup2(f->R.rdi, f->R.rsi);
+		break;
+	//ptoject 12
+	case SYS_MMAP:
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		break;
+	case SYS_MUNMAP:
+		munmap(f->R.rdi);
 		break;
 	default:
 		exit(-1);
@@ -407,4 +417,45 @@ void process_close_file (int fd)
 		return ;
 	
 	curr->fdTable[fd] = NULL;
+}
+
+//project 12
+/*오프셋에서 시작하여 addr에 있는 프로세스의 가상주소공간으로 fd로 열린 파일이 길이 바이트를 매핑합니다.
+전체 파일은 addr에서 시작하는 연속적인 가상페이지에 매핑됩니다.
+파일길이가 PGSIZE의 배수가 아닌경우 매핑된 최종 페이지의 일부 바이트가 파일 끝을 넘어 삐져나옵니다.
+페이지에 오류가 발생하면 이 바이트를 0 으로 설정하고 페이지를 디스크에 다시 쓸 때 버립니다
+성공하면 이 함수는 파일이 매핑된 가상주소를 반환합니다.
+실패하면 파일을 매핑하는데 유효한 주소가 아닌 null을 반환해야합니다*/
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset)
+{
+    if(offset % PGSIZE != 0){ //offset 말고 length 아닐까..? 아닌듯
+        return NULL;
+    }
+
+    if (pg_round_down(addr) != addr || is_kernel_vaddr(addr) || addr == NULL || (long long)length <= 0 || addr == 0)
+        return NULL;
+    
+    if(fd == 0 || fd == 1)
+        exit(-1);
+    
+    //! vm_overlap
+    if(spt_find_page(&thread_current()->spt, addr)) // 이미 있으면
+        return NULL;
+
+    struct file *target = process_get_file(fd);
+
+    if(target == NULL) //? fd가 0이랑 1인 것도 알아서 걸러준다.!!
+        return NULL;
+
+    void * ret = do_mmap(addr, length, writable, target, offset);
+
+    return ret;
+}
+
+//project 11
+//아직 매핑 해제되지 않은 동일한 프로세스에서 mmap에 대한 이전 호출에서 반환된 가상주소여야 하는 지정된 주소 범위 addr에 대한 매핑을 해제합니다
+// addr 주소의 범위에 대한 매핑을 unmap해라
+void munmap (void *addr)
+{
+    do_munmap(addr);
 }

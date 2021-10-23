@@ -55,7 +55,7 @@ struct page {
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
-	union {
+	union { //한번에 하
 		struct uninit_page uninit;
 		struct anon_page anon;
 		struct file_page file;
