@@ -52,7 +52,10 @@ struct page {
 	struct hash_elem hash_elem;
 	/* Your implementation */
 
+	uint8_t type;
+
 	bool writable;
+	bool is_loaded;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */

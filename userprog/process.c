@@ -440,6 +440,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
 
+
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
@@ -616,7 +617,7 @@ validate_segment (const struct Phdr *phdr, struct file *file) {
  * outside of #ifndef macro. */
 
 /* load() helpers. */
-bool install_page (void *upage, void *kpage, bool writable);
+static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Loads a segment starting at offset OFS in FILE at address
  * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
@@ -776,7 +777,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		struct box *box = (struct box*)malloc(sizeof(struct box));
+    struct box *box = (struct box*)malloc(sizeof(struct box));
 
 		box->file = file;
 		box->ofs = ofs;
@@ -814,13 +815,10 @@ setup_stack (struct intr_frame *if_) {
 		success = vm_claim_page(stack_bottom);
 		
 		if (success){
-			// printf("here??\n");
-			if_->rsp = USER_STACK;
-            thread_current()->stack_bottom = stack_bottom;
+				if_->rsp = USER_STACK;
+							thread_current()->stack_bottom = stack_bottom;
 		}
-
   }
-
 	return success;
 }
 #endif /* VM */

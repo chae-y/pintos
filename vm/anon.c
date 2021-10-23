@@ -3,6 +3,7 @@
 #include "vm/vm.h"
 #include "devices/disk.h"
 #include "threads/vaddr.h"
+#include "bitmap.h"
 
 /* DO NOT MODIFY BELOW LINE */
 static struct disk *swap_disk;

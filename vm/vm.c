@@ -99,19 +99,19 @@ err:
 // spt테이블에서 내가 원하는 테이블을 찾는 함수
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = (struct page*)malloc(sizeof(struct page));
+  struct page* page = (struct page*)malloc(sizeof(struct page));
 	/* TODO: Fill this function. */
 
-	struct hash_elem *e;
+  struct hash_elem *e;
 
 	// 특정 페이지에 va를 가진 페이지의 시작점을 가리킨다.
 	page -> va = pg_round_down(va);
 
-	e = hash_find(&spt->pages, &page -> hash_elem);
+  e = hash_find(&spt->pages, &page->hash_elem);
 
 	free(page);
 
-	return e =! NULL ? hash_entry (e, struct page, hash_elem) : NULL;
+	return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL;
 }
 
 /* Insert PAGE into spt with validation. */
@@ -160,20 +160,21 @@ vm_get_frame(void)
 {
     struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
 
-    frame->kva = palloc_get_page(PAL_USER);
-    if(frame->kva == NULL)
-    {
-        frame = vm_evict_frame();
-        frame->page = NULL;
-        return frame;
-    }
-    list_push_back (&frame_table, &frame->frame_elem);
+	frame->kva = palloc_get_page(PAL_USER);
+  if(frame->kva == NULL)
+  {
+      frame = vm_evict_frame();
+      frame->page = NULL;
+      return frame;
+  }
+  
+  list_push_back (&frame_table, &frame->frame_elem);
 
-    frame->page = NULL;
+	frame->page = NULL;
 
-    ASSERT(frame != NULL);
-    ASSERT(frame->page == NULL);
-    return frame;
+  ASSERT(frame != NULL);
+  ASSERT(frame->page == NULL);
+  return frame;
 }
 
 /* Growing the stack. */
