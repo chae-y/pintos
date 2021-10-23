@@ -11,7 +11,21 @@ void process_exit (void);
 void process_activate (struct thread *next);
 void argument_stack(char **argv, int argc, struct intr_frame *if_);
 
+bool install_page (void *upage, void *kpage, bool writable);
+
 struct thread *get_child_with_pid(int pid);
 
+
+bool install_page (void *upage, void *kpage, bool writable);
+bool setup_stack (struct intr_frame *if_);
+bool lazy_load_segment (struct page *page, void *aux);
+
+
+struct box {
+  struct file *file;
+
+  off_t ofs;
+  size_t page_read_bytes;
+};
 
 #endif /* userprog/process.h */
