@@ -142,10 +142,11 @@ struct thread
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt; // vm is in spt
-	// Project 3.1_memory management
-	void* rsp_stack; // stack grow 할 때 사용
+	
+	/* Svaing rsp into struct thread on the initial transition
+	 * from user to kernel mode */
+	uintptr_t saved_sp;
 	void* stack_bottom;
-	// Project 3.1_end
 #endif
 
 	/* Owned by thread.c. */

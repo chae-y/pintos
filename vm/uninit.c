@@ -15,7 +15,7 @@ static bool uninit_initialize (struct page *page, void *kva);
 static void uninit_destroy (struct page *page);
 
 /* DO NOT MODIFY this struct */
-static const struct page_operations uninit_ops = 
+static const struct page_operations uninit_ops = {
 	.swap_in = uninit_initialize,
 	.swap_out = NULL,
 	.destroy = uninit_destroy,

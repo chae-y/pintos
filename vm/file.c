@@ -14,10 +14,30 @@ static const struct page_operations file_ops = {
 	.destroy = file_backed_destroy, // has value 'file_backed_destroy'
 	.type = VM_FILE,
 };
+static struct list mmap_file_list;
+
+struct mmap_file_info{
+	struct list_elem elem;
+	uint64_t start;
+	// start addr of final page
+	uint64_t end;
+};
 
 /* The initializer of file vm */
 void
 vm_file_init (void) {
+}
+
+/* Initialize the file mapped page */
+bool
+file_map_initializer (struct page *page, enum vm_type type, void *kva) {
+	/* Set up the handler */
+	struct file* file = ((struct mmap_info*)page ->uninit.aux)->file;
+	page->operations = &file_ops;
+
+	struct file_page *file_page = &page->file;
+	file_page -> file = file;
+	return true;
 }
 
 /* Initialize the file backed page */

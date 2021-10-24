@@ -96,7 +96,7 @@ struct page_operations {
  * All designs up to you for this. */
 struct supplemental_page_table {
 	// project3.1_memory management
-	struct hash pages;
+	struct hash* page_table;
 	// project3.1_end
 };
 
@@ -123,14 +123,14 @@ bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
 
 // Project 3.1_memory management
-unsigned
+static uint64_t
 page_hash (const struct hash_elem *p_, void *aux UNUSED);
-bool
+static bool
 page_less (const struct hash_elem *a_,
            const struct hash_elem *b_, void *aux UNUSED);
 bool insert_page(struct hash *pages, struct page *p);
 // Project 3.2_anonymous page
-void spt_destructor(struct hash_elem *e, void* aux);
+
 struct load_info{
 	struct file *file;
 	off_t ofs;

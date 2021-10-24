@@ -405,24 +405,24 @@ process_activate (struct thread *next) {
 
 /* Executable header.  See [ELF1] 1-4 to 1-8.
  * This appears at the very beginning of an ELF binary. */
-struct ELF64_hdr {
+struct ELF64_hdr { // Ehdr = ELF header
 	unsigned char e_ident[EI_NIDENT];
-	uint16_t e_type;
-	uint16_t e_machine;
-	uint32_t e_version;
-	uint64_t e_entry;
-	uint64_t e_phoff;
-	uint64_t e_shoff;
-	uint32_t e_flags;
-	uint16_t e_ehsize;
-	uint16_t e_phentsize;
-	uint16_t e_phnum;
-	uint16_t e_shentsize;
-	uint16_t e_shnum;
-	uint16_t e_shstrndx;
+	uint16_t e_type; // 1,2,3,4 각각 재배치, 실행, 공유, 코어 명시
+	uint16_t e_machine; // 0x3E : x86-64
+	uint32_t e_version; // 오리지널 버전의 ELF인 경우 1로 설정됨
+	uint64_t e_entry; // Entry point 메모리 주소
+	uint64_t e_phoff; // Program header table offset 시작 포인트
+	uint64_t e_shoff; // Section header table offset 시작 포인트
+	uint32_t e_flags; 
+	uint16_t e_ehsize; // header의 크기
+	uint16_t e_phentsize; // Program header table entry 크기
+	uint16_t e_phnum; // Program header table entry 개수
+	uint16_t e_shentsize; // Section header table entry 크기
+	uint16_t e_shnum; // Section header table entry 개수
+	uint16_t e_shstrndx; // Sectino header table entry의 인덱스 (section 이름 포함)
 };
 
-struct ELF64_PHDR {
+struct ELF64_PHDR { // Program header table
 	uint32_t p_type;
 	uint32_t p_flags;
 	uint64_t p_offset;
@@ -482,16 +482,16 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
-			|| ehdr.e_type != 2
-			|| ehdr.e_machine != 0x3E // amd64
-			|| ehdr.e_version != 1
-			|| ehdr.e_phentsize != sizeof (struct Phdr)
-			|| ehdr.e_phnum > 1024) {
+			|| ehdr.e_type != 2 // 1,2,3,4 는 각각 재배치, 실행, 공유, 코어를 명시
+			|| ehdr.e_machine != 0x3E // amd64. x86-64
+			|| ehdr.e_version != 1  // 오리지널 버전의 ELF인 경우 1
+			|| ehdr.e_phentsize != sizeof (struct Phdr) // 프로그램 헤더 테이블 엔트리의 크기
+			|| ehdr.e_phnum > 1024) { // 프로그램 헤더 테이블에서 엔트리 개수
 		printf ("load: %s: error loading executable\n", argv[0]);
 		goto done;
 	}
 	/* Read program headers. */
-	file_ofs = ehdr.e_phoff;
+	file_ofs = ehdr.e_phoff; // e_phoff : 프로그램 헤더 테이블 시작을 가리킴
 	for (i = 0; i < ehdr.e_phnum; i++) {
 		struct Phdr phdr;
 
@@ -548,6 +548,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 
 	/* Start address. */
+	// Stores the executable's entry point into *RIP
 	if_->rip = ehdr.e_entry;
 
 	/* TODO: Your code goes here.
