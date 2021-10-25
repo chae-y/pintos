@@ -145,20 +145,49 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
-	struct frame *victim = NULL;
-	 /* TODO: The policy for eviction is up to you. */
+	/* Simple Clock Algorithm with Vairable Space? */
+	struct frame *candidate = NULL;
+	struct thread *curr = thread_current ();
 
-	return victim;
+	// This need careful synchronization, race between threads.
+	lock_acquire (&clock_lock);
+	struct list_elem *cand_elem = clock_elem;
+	if (cand_elem == NULL && !list_empty (&frame_list))
+	      cand_elem = list_front (&frame_list);
+	while (cand_elem != NULL) {
+	      // Check frame accessed
+	      candidate = list_entry (cand_elem, struct frame, elem);
+	      if (!pml4_is_accessed (curr->pml4, candidate->page->va)) // 참조 비트 0인걸 찾음 = victim
+		    break; // Found!
+	      pml4_set_accessed (curr->pml4, candidate->page->va, false); // 참조 비트 1->0
+	      cand_elem = list_next_cycle (&frame_list, cand_elem);	} // 포인터 이동
+
+	// Candidate in frame_list at clock_elem will be evicted.
+	// Tick clock.
+	clock_elem = list_next_cycle (&frame_list, cand_elem); // 다음 elem 가리킴
+	list_remove (cand_elem); // victim 제거
+	lock_release (&clock_lock);
+
+	return candidate;
 }
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
-	/* TODO: swap out the victim and return the evicted frame. */
-	
-	return NULL;
+	struct frame *victim = vm_get_victim ();
+	if (victim == NULL) return NULL;
+
+	/* Swap out the victim and return the evicted frame. */
+	struct page *page = victim->page;
+	bool swap_done = swap_out (page);
+	if (!swap_done) PANIC("Swap is full!\n");
+
+	// Clear frame
+	victim->page = NULL;
+	memset (victim->kva, 0, PGSIZE);
+
+	return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -224,8 +253,6 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *fault_addr,
 	}
 	struct page* page = spt_find_page(spt, fault_addr);
 	if (page == NULL) return false;
-	// printf("vm_try_handle 이네!!!!\n");
-	// printf("이거 가능?\n");
 	if (write && !not_present) return vm_handle_wp (page);
 	return vm_do_claim_page (page);
 	// Project 3.3_end
@@ -293,7 +320,7 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
 // 							  struct supplemental_page_table *src UNUSED) {
 // 	// Project 3.2_anonymous page
 // 	struct hash_iterator i;
-// 	hash_first(&i, &src->pages); // src->pages : struct hash
+// 	hash_first(&i, &src->page_table); // src->pages : struct hash
 // 	while(hash_next(&i))
 // 	{
 		
@@ -331,6 +358,9 @@ supplemental_page_table_init (struct supplemental_page_table *spt) {
 // }
 
 // starmcc
+// 다른 초기화 함수들을 사용하기 위해 revisiting 함
+// copies the spt from src to dst. This is used when a child needs to inherit the
+// execution context of its parent (fork)
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst,
 		struct supplemental_page_table *src) {
@@ -344,26 +374,24 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		if (page -> operations -> type == VM_UNINIT){
 			vm_initializer* init = page ->uninit.init;
 			bool writable = page -> writable;
-			int type = page ->uninit.type;
-			if (type & VM_ANON){
+			int type = page -> uninit.type;
+			if (type & VM_ANON){ // lazy loading시 uninit -> anonymous 하는 경우
 				struct load_info* li = malloc (sizeof (struct load_info));
-				li -> file = file_duplicate (((struct load_info *) page -> uninit .aux)->file);
-				li -> page_read_bytes = ((struct load_info *) page -> uninit .aux)->page_read_bytes;
-				li -> page_zero_bytes = ((struct load_info *) page -> uninit .aux)->page_zero_bytes;
-				li -> ofs = ((struct load_info *) page -> uninit .aux)->ofs;
+				li -> file = file_duplicate (((struct load_info *) page -> uninit.aux)->file);
+				li -> page_read_bytes = ((struct load_info *) page -> uninit.aux)->page_read_bytes;
+				li -> page_zero_bytes = ((struct load_info *) page -> uninit.aux)->page_zero_bytes;
+				li -> ofs = ((struct load_info *) page -> uninit.aux)->ofs;
 				vm_alloc_page_with_initializer (type, page -> va, writable, init, (void*) li);
 			}
-			else if (type & VM_FILE){
-				//Do_nothing(it should not inherit mmap)
+			else if (type & VM_FILE){ // lazy loading시 uninit -> file_backed 하는 경우. Do_nothing(it should not inherit mmap)
 			}
-
 		}
 		
 		/* Handle ANON/FILE page*/
 		else if (page_get_type(page) == VM_ANON){
 			if (!vm_alloc_page (page -> operations -> type, page -> va, page -> writable))
 				return false;
-			struct page* new_page = spt_find_page (&thread_current () -> spt, page -> va);
+			struct page* new_page = spt_find_page (&thread_current () -> spt, page -> va); // ????????
 			if (!vm_do_claim_page (new_page))
 				return false;
 			memcpy (new_page -> frame -> kva, page -> frame -> kva, PGSIZE);

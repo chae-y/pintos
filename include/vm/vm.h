@@ -18,7 +18,7 @@ enum vm_type {
 
 	/* Auxillary bit flag marker for store information. You can add more
 	 * markers, until the value is fit in the int. */
-	VM_MARKER_0 = (1 << 3),
+	VM_MARKER_0 = (1 << 3), // stack
 	VM_MARKER_1 = (1 << 4),
 
 	/* DO NOT EXCEED THIS VALUE. */
@@ -131,7 +131,7 @@ page_less (const struct hash_elem *a_,
 bool insert_page(struct hash *pages, struct page *p);
 // Project 3.2_anonymous page
 
-struct load_info{
+struct load_info {
 	struct file *file;
 	off_t ofs;
 	size_t page_read_bytes;

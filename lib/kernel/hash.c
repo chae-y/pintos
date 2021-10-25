@@ -52,7 +52,7 @@ hash_clear (struct hash *h, hash_action_func *destructor) {
 	size_t i;
 
 	for (i = 0; i < h->bucket_cnt; i++) {
-		struct list *bucket = &h->buckets[i];
+		struct list *bucket = &h->buckets[i]; // list buckets
 
 		if (destructor != NULL)
 			while (!list_empty (bucket)) {
@@ -60,10 +60,8 @@ hash_clear (struct hash *h, hash_action_func *destructor) {
 				struct hash_elem *hash_elem = list_elem_to_hash_elem (list_elem);
 				destructor (hash_elem, h->aux);
 			}
-
 		list_init (bucket);
 	}
-
 	h->elem_cnt = 0;
 }
 
