@@ -183,6 +183,17 @@ vm_get_frame(void)
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	void *stack_bottom = pg_round_down (addr);
+	size_t req_stack_size = USER_STACK - (uintptr_t)stack_bottom;
+	if (req_stack_size > (1 << 20)) PANIC("Stack limit exceeded!\n"); // 1MB
+
+	// Alloc page from tested region to previous claimed stack page.
+	void *growing_stack_bottom = stack_bottom;
+	while ((uintptr_t) growing_stack_bottom < USER_STACK &&
+		vm_alloc_page (VM_ANON | VM_MARKER_0, growing_stack_bottom, true)) {
+	      growing_stack_bottom += PGSIZE;
+	};
+	vm_claim_page (stack_bottom);
 }
 
 /* Handle the fault on write_protected page */
@@ -194,6 +205,7 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+	struct thread *curr = thread_current ();
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
@@ -202,13 +214,19 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		return false;
 	}
 
-	// void *rsp_stack = is_kernel_vaddr(f -> rsp) ? thread_current() -> rsp_stack : f -> rsp;
-
-	if(not_present){
-		return vm_claim_page(addr);
+	void *stack_bottom = pg_round_down (curr->saved_sp);
+	if (write && (stack_bottom - PGSIZE <= addr &&
+	      (uintptr_t) addr < USER_STACK)) {
+	  /* Allow stack growth writing below single PGSIZE range
+	   * of current stack bottom inferred from stack pointer. */
+	  vm_stack_growth (addr);
+	  return true;
 	}
 
-	return false;
+	struct page* page = spt_find_page (spt, addr);
+	if (page == NULL) return false;
+	if (write && !not_present) return vm_handle_wp (page);
+	return vm_do_claim_page (page);
 }
 
 /* Free the page.
@@ -253,7 +271,9 @@ vm_do_claim_page(struct page *page)
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
-    hash_init(spt->pages, page_hash, page_less, NULL);
+    struct hash* page_table = malloc(sizeof (struct hash));
+	hash_init (page_table, page_hash, page_less, NULL);
+	spt -> pages = page_table;
 }
 
 /* Copy supplemental page table from src to dst */

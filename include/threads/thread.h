@@ -143,6 +143,7 @@ struct thread
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt; //! vm is in spt
 	void* stack_bottom;
+	uintptr_t saved_sp;
 #endif
 
 	/* Owned by thread.c. */
