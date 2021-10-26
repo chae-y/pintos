@@ -44,6 +44,9 @@ int process_add_file (struct file *);
 struct file *process_get_file (int);
 void process_close_file (int);
 
+//project 12
+void check_valid_buffer(void* buffer, unsigned size, void* rsp, bool to_write);
+
 const int STDIN = 1;
 const int STDOUT = 2;
 struct lock file_lock;
@@ -80,7 +83,7 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 
-	//project 11
+	//project 12
 	#ifdef VM
     thread_current()->rsp_stack = f->rsp;
     #endif
@@ -116,9 +119,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		f->R.rax = filesize(f->R.rdi);
 		break;
 	case SYS_READ:
+		//project 12
+		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 1);
 		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_WRITE:
+		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 0);
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_SEEK:
@@ -135,7 +141,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	//ptoject 12
 	case SYS_MMAP:
-		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8); // 와 이거 진짜 모르겠다^_^
 		break;
 	case SYS_MUNMAP:
 		munmap(f->R.rdi);
@@ -151,6 +157,28 @@ void check_address(const uint64_t *uaddr)
 	struct thread *curr = thread_current ();
 	if (uaddr == NULL || !(is_user_vaddr(uaddr)) || pml4_get_page(curr->pml4, uaddr) == NULL)
 		exit(-1);
+}
+
+//project 12
+struct page * check_address2(void *addr){
+    if (is_kernel_vaddr(addr))
+    {
+        exit(-1);
+    }
+    return spt_find_page(&thread_current()->spt, addr);
+}
+
+//project 12
+void check_valid_buffer(void* buffer, unsigned size, void* rsp, bool to_write)
+{
+    for (int i = 0; i < size; i++)
+    {
+        struct page* page = check_address2(buffer + i);
+        if(page == NULL)
+            exit(-1);
+        if(to_write == true && page->writable == false)
+            exit(-1);
+    }
 }
 
 /* PintOS를 종료한다. */
@@ -311,6 +339,8 @@ void seek (int fd, unsigned position)
 		return ;
 
 	file_obj->pos = position;
+	//project 12
+	file_seek(file_obj, position);
 }
 
 
@@ -452,7 +482,7 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset)
     return ret;
 }
 
-//project 11
+//project 12
 //아직 매핑 해제되지 않은 동일한 프로세스에서 mmap에 대한 이전 호출에서 반환된 가상주소여야 하는 지정된 주소 범위 addr에 대한 매핑을 해제합니다
 // addr 주소의 범위에 대한 매핑을 unmap해라
 void munmap (void *addr)

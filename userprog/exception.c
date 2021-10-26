@@ -87,6 +87,7 @@ kill (struct intr_frame *f) {
 					thread_name (), f->vec_no, intr_name (f->vec_no));
 			intr_dump_frame (f);
 			thread_exit ();
+			// exit();
 
 		case SEL_KCSEG:
 			/* Kernel's code segment, which indicates a kernel bug.
@@ -118,6 +119,7 @@ kill (struct intr_frame *f) {
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
 page_fault (struct intr_frame *f) {
+	struct thread *curr = thread_current();
 	bool not_present;  /* True: not-present page, false: writing r/o page. */
 	bool write;        /* True: access was write, false: access was read. */
 	bool user;         /* True: access by user, false: access by kernel. */
@@ -140,6 +142,9 @@ page_fault (struct intr_frame *f) {
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
+	// if(user){
+	// 	curr->rsp_stack = f->rsp;
+	// }
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
@@ -158,7 +163,7 @@ page_fault (struct intr_frame *f) {
 
 	/* child-bad test가 rsp의 위피를 바꾸는데 page fault는 projcet 3에서 다루므로*/
 	/* 일단 exit을 통해 pass를 시킨다       */
-	//kill (f);
-	exit(-1);
+	kill (f);
+	// exit(-1);
 }
 

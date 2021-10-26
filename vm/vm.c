@@ -143,12 +143,33 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 }
 
 /* Get the struct frame, that will be evicted. */
+//project 몇이지?ㅎ
 static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
-	 /* TODO: The policy for eviction is up to you. */
+    /* TODO: The policy for eviction is up to you. */
+    struct thread *curr = thread_current();
+    struct list_elem *e = start;
 
-	return victim;
+    for (start = e; start != list_end(&frame_table); start = list_next(start))
+    {
+        victim = list_entry(start, struct frame, frame_elem);
+        if (pml4_is_accessed(curr->pml4, victim->page->va))
+            pml4_set_accessed (curr->pml4, victim->page->va, 0);
+        else
+            return victim;
+    }
+
+    for (start = list_begin(&frame_table); start != e; start = list_next(start))
+    {
+        victim = list_entry(start, struct frame, frame_elem);
+        if (pml4_is_accessed(curr->pml4, victim->page->va))
+            pml4_set_accessed (curr->pml4, victim->page->va, 0);
+        else
+            return victim;
+    }
+
+    return victim;
 }
 
 //project 9
@@ -373,8 +394,8 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 
         if (page->operations->type == VM_FILE)
         {
-            // do_munmap(page->va);
-            destroy(page);
+            do_munmap(page->va);
+            // destroy(page);
         }
         // free(page);
     }

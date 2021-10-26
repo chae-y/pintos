@@ -24,4 +24,5 @@ struct box {
     size_t page_read_bytes;
 };
 
+bool lazy_load_segment (struct page *page, void *aux);
 #endif /* userprog/process.h */

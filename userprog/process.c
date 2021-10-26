@@ -116,7 +116,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux)
 	newpage = palloc_get_page(PAL_USER);
 	if (newpage == NULL)
 	{
-		printf("[fork-duplicate] failed to palloc new page\n"); // #ifdef DEBUG
+		// printf("[fork-duplicate] failed to palloc new page\n"); // #ifdef DEBUG
 		return false;
 	}
 	/* 4. TODO: Duplicate parent's page to the new page and
@@ -130,7 +130,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux)
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
-		printf("\n error at 6. TODO \n");
+		//project 몇인지 모르겠지만 바꿈ㅎ
+		palloc_free_page(newpage);
 		return false;
 	}
 	return true;
@@ -734,7 +735,7 @@ install_page (void *upage, void *kpage, bool writable) {
 페이지 구조체와 aux를 인수로 받습니다
 aux는 load_segment에서 설정한 정보입니다
 이 정보를 사용하여 세그먼트를 읽을 파일을 찾고 결국 세그먼트를 메모리로 읽어야합니다.*/
-static bool
+bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
