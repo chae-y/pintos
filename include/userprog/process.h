@@ -20,12 +20,11 @@ bool install_page (void *upage, void *kpage, bool writable);
 bool setup_stack (struct intr_frame *if_);
 bool lazy_load_segment (struct page *page, void *aux);
 
-
-struct box {
-  struct file *file;
-
-  off_t ofs;
-  size_t page_read_bytes;
+struct load_info{
+	struct file *file;
+	off_t ofs;
+	size_t page_read_bytes;
+	size_t page_zero_bytes;
 };
 
 #endif /* userprog/process.h */

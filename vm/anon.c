@@ -57,5 +57,18 @@ anon_swap_out (struct page *page) {
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
 static void
 anon_destroy (struct page *page) {
-	struct anon_page *anon_page = &page->anon;
+	// struct anon_page *anon_page = &page->anon;
+
+	if (page -> frame!= NULL){
+		list_remove (&page->frame->frame_elem);
+		free(page->frame);
+	}
+	// else {
+	// 	// Swapped anon page case
+	// 	struct anon_page *anon_page = &page->anon;
+	// 	ASSERT (anon_page->swap_slot_idx != INVALID_SLOT_IDX);
+
+	// 	// Clear swap table
+	// 	bitmap_set (swap_table, anon_page->swap_slot_idx, false);
+	// }
 }
