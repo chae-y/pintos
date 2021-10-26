@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "intrinsic.h"
+#include "vm/vm.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -36,6 +37,8 @@ void close (int fd);
 
 int dup2(int oldfd, int newfd);
 
+static void* mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+static void munmap (void* addr);
 
 int process_add_file (struct file *);
 struct file *process_get_file (int);
@@ -123,6 +126,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	case SYS_DUP2:
 		f->R.rax = dup2(f->R.rdi, f->R.rsi);
+		break;
+	//project 3-mmf
+	case SYS_MMAP:
+		f->R.rax = (uint64_t) mmap ((void*) f->R.rdi, (size_t) f->R.rsi, (int) f->R.rdx, (int) f->R.r10, (off_t) f->R.r8);
+		break;
+	case SYS_MUNMAP:
+		munmap ((void*) f->R.rdi);
 		break;
 	default:
 		exit(-1);
@@ -401,4 +411,27 @@ void process_close_file (int fd)
 		return ;
 	
 	curr->fdTable[fd] = NULL;
+}
+
+static void*
+mmap (void *addr, size_t length, int writable, int fd, off_t offset){
+	//Handle all parameter error and pass it to do_mmap
+	if (addr == 0 || (!is_user_vaddr(addr))) return NULL;
+	if ((uint64_t)addr % PGSIZE != 0) return NULL; //page fault 시 자름!
+	if (offset % PGSIZE != 0) return NULL;
+	// if ((uint64_t)addr + length == 0) return NULL;
+	if (!is_user_vaddr((uint64_t)addr + length)) return NULL;
+	for (uint64_t i = (uint64_t) addr; i < (uint64_t) addr + length; i += PGSIZE){
+		if (spt_find_page (&thread_current() -> spt, (void*) i)!=NULL) return NULL;
+	}
+	struct file* file = process_get_file (fd);
+	if (file == NULL) return NULL;
+	if (file == 1 || file == 2) return NULL;
+	if (length == 0) return NULL;
+	return do_mmap(addr, length, writable, file, offset);
+}
+
+static void
+munmap (void* addr){
+	do_munmap(addr);
 }
