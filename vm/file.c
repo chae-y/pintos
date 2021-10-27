@@ -2,6 +2,9 @@
 
 #include "vm/vm.h"
 #include "threads/vaddr.h"
+#include "vm/file.h"
+#include <string.h>
+#include "threads/malloc.h"
 #include "threads/mmu.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
