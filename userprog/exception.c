@@ -118,6 +118,7 @@ kill (struct intr_frame *f) {
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
 page_fault (struct intr_frame *f) {
+	struct thread *curr = thread_current ();
 	bool not_present;  /* True: not-present page, false: writing r/o page. */
 	bool write;        /* True: access was write, false: access was read. */
 	bool user;         /* True: access by user, false: access by kernel. */
@@ -140,25 +141,36 @@ page_fault (struct intr_frame *f) {
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
+	if (user) {
+		// Transition from user context to kernel by page fault.
+		curr->saved_sp = f->rsp;
+	}
+
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
 
+	if (user)
+	{
+		// curr->exitcode = -1;
+		f->cs = SEL_UCSEG;
+	}
+
 	/* Count page faults. */
 	page_fault_cnt++;
 
 	/* If the fault is true fault, show info and exit. */
-	printf ("Page fault at %p: %s error %s page in %s context.\n",
-			fault_addr,
-			not_present ? "not present" : "rights violation",
-			write ? "writing" : "reading",
-			user ? "user" : "kernel");
+	// printf ("Page fault at %p: %s error %s page in %s context.\n",
+	// 		fault_addr,
+	// 		not_present ? "not present" : "rights violation",
+	// 		write ? "writing" : "reading",
+	// 		user ? "user" : "kernel");
 
 	/* child-bad test가 rsp의 위피를 바꾸는데 page fault는 projcet 3에서 다루므로*/
 	/* 일단 exit을 통해 pass를 시킨다       */
-	//kill (f);
-	exit(-1);
+	kill (f);
+	// exit(-1);
 }
 

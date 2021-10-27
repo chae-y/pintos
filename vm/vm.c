@@ -11,8 +11,9 @@
 #include "vm/file.h"
 #include "userprog/process.h"
 
-struct list frame_table;
-struct list_elem* start;
+struct list frame_list;
+static struct list_elem *clock_elem;
+static struct lock clock_lock;
 
 static struct lock spt_kill_lock;
 
@@ -31,8 +32,9 @@ vm_init (void) {
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
 	lock_init(&spt_kill_lock);
-	list_init(&frame_table);
-	start = list_begin(&frame_table);
+	list_init(&frame_list);
+	clock_elem = NULL;
+	lock_init (&clock_lock);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -134,23 +136,63 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 	return;
 }
 
+static struct list_elem *
+list_next_cycle (struct list *lst, struct list_elem *elem) {
+      struct list_elem *cand_elem = elem;
+      if (cand_elem == list_back (lst))
+	    // Repeat from the front
+	    cand_elem = list_front (lst);
+      else
+	    cand_elem = list_next (cand_elem);
+      return cand_elem;
+}
+
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
-	struct frame *victim = NULL;
-	 /* TODO: The policy for eviction is up to you. */
+	/* Simple Clock Algorithm with Vairable Space? */
+	struct frame *candidate = NULL;
+	struct thread *curr = thread_current ();
 
-	return victim;
+	// This need careful synchronization, race between threads.
+	lock_acquire (&clock_lock);
+	struct list_elem *cand_elem = clock_elem;
+	if (cand_elem == NULL && !list_empty (&frame_list))
+	      cand_elem = list_front (&frame_list);
+	while (cand_elem != NULL) {
+	      // Check frame accessed
+	      candidate = list_entry (cand_elem, struct frame, frame_elem);
+	      if (!pml4_is_accessed (curr->pml4, candidate->page->va))//참조비트가 1인걸 못찾은거==0인걸 찾은것
+		    break; // Found!
+	      pml4_set_accessed (curr->pml4, candidate->page->va, false);//참조비트 1->0으로 바꿔줌
+
+	      cand_elem = list_next_cycle (&frame_list, cand_elem);	}//포인터 넘기고
+	// Candidate in frame_list at clock_elem will be evicted.
+	// Tick clock.
+	clock_elem = list_next_cycle (&frame_list, cand_elem);//포인터 옮기는거인가봐
+	list_remove (cand_elem); // 그 위치를 지우고
+	lock_release (&clock_lock);
+
+	return candidate; // 그위치에 넣어주라고 리턴함
 }
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
-	/* TODO: swap out the victim and return the evicted frame. */
+	struct frame *victim = vm_get_victim ();
+	if (victim == NULL) return NULL;
 
-	return NULL;
+	/* Swap out the victim and return the evicted frame. */
+	struct page *page = victim->page;
+	bool swap_done = swap_out (page);
+	if (!swap_done) PANIC("Swap is full!\n");
+
+	// Clear frame
+	victim->page = NULL;
+	memset (victim->kva, 0, PGSIZE);
+
+	return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -172,7 +214,7 @@ vm_get_frame(void)
       return frame;
   }
   
-  list_push_back (&frame_table, &frame->frame_elem);
+//   list_push_back (&frame_table, &frame->frame_elem);
 
 	frame->page = NULL;
 
@@ -200,6 +242,7 @@ vm_stack_growth (void *addr UNUSED) {
 /* Handle the fault on write_protected page */
 static bool
 vm_handle_wp (struct page *page UNUSED) {
+	return false;
 }
 
 /* Return true on success */
@@ -260,6 +303,13 @@ vm_do_claim_page(struct page *page)
 
     frame->page = page;
     page->frame = frame;
+
+	// Add to frame_list for eviction clock algorithm
+	if (clock_elem != NULL)
+		// Just before current clock
+		list_insert (clock_elem, &frame->frame_elem);
+	else
+		list_push_back (&frame_list, &frame->frame_elem);
 
     if(install_page(page->va, frame->kva, page->writable))
     {
