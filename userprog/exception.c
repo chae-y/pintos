@@ -83,9 +83,9 @@ kill (struct intr_frame *f) {
 		case SEL_UCSEG:
 			/* User's code segment, so it's a user exception, as we
 			   expected.  Kill the user process.  */
-			printf ("%s: dying due to interrupt %#04llx (%s).\n",
-					thread_name (), f->vec_no, intr_name (f->vec_no));
-			intr_dump_frame (f);
+			// printf ("%s: dying due to interrupt %#04llx (%s).\n",
+			// 		thread_name (), f->vec_no, intr_name (f->vec_no));
+			// intr_dump_frame (f);
 			thread_exit ();
 
 		case SEL_KCSEG:
@@ -151,16 +151,16 @@ page_fault (struct intr_frame *f) {
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
-
-	if (user)
-	{
-		// curr->exitcode = -1;
-		f->cs = SEL_UCSEG;
-	}
+	
+	// if (user)
+	// {
+	// 	curr->exitcode = -1;
+	// 	f->cs = SEL_UCSEG;
+	// }
 
 	/* Count page faults. */
 	page_fault_cnt++;
-
+	exit(-1);
 	/* If the fault is true fault, show info and exit. */
 	// printf ("Page fault at %p: %s error %s page in %s context.\n",
 	// 		fault_addr,
