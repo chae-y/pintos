@@ -129,8 +129,9 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
-	vm_dealloc_page (page);
-	return true;
+	struct hash_elem* e = hash_delete (spt -> pages, &page ->hash_elem);
+	if (e != NULL) vm_dealloc_page (page);
+	return;
 }
 
 /* Get the struct frame, that will be evicted. */
@@ -310,7 +311,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst,
 		else if (page_get_type(page) == VM_ANON){
 			if (!vm_alloc_page (page -> operations -> type, page -> va, page -> writable))
 				return false;
-			struct page* new_page = spt_find_page (&thread_current () -> spt, page -> va);
+			struct page* new_page = spt_find_page (&thread_current () -> spt, page -> va); // current가 자식임
 			if (!vm_do_claim_page (new_page))//모르겠다^_^
 				return false;
 			memcpy (new_page -> frame -> kva, page -> frame -> kva, PGSIZE);
