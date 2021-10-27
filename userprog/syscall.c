@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "intrinsic.h"
+// Project 3_
+#include "vm/file.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -35,7 +37,9 @@ unsigned tell (int fd);
 void close (int fd);
 
 int dup2(int oldfd, int newfd);
-
+// Project 3.4_memory mapped file
+static void* mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+static void munmap (void* addr);
 
 int process_add_file (struct file *);
 struct file *process_get_file (int);
@@ -76,6 +80,8 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
+	struct thread* curr = thread_current ();
+	curr->saved_sp = f->rsp;
 	switch (f->R.rax)
 	{
 	case SYS_HALT:
@@ -107,9 +113,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		f->R.rax = filesize(f->R.rdi);
 		break;
 	case SYS_READ:
+		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 1);
 		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_WRITE:
+	 	check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 0);
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_SEEK:
@@ -124,17 +132,55 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	case SYS_DUP2:
 		f->R.rax = dup2(f->R.rdi, f->R.rsi);
 		break;
-	default:
-		exit(-1);
+	// Project 3 and optionally project 4.
+	case SYS_MMAP:
+		f->R.rax = (uint64_t) mmap ((void*) f->R.rdi, (size_t) f->R.rsi, (int) f->R.rdx, (int) f->R.r10, (off_t) f->R.r8);
 		break;
+	case SYS_MUNMAP:
+		munmap((void*) f->R.rdi);
+		break;
+	// default:
+	// 	exit(-1);
+	// 	break;
+	NOT_REACHED();
 	}
 }
+
+//syscall support macros
+#define MAX_FILE_NAME 14
+#define EOF (-1)
 
 void check_address(const uint64_t *uaddr)
 {
 	struct thread *curr = thread_current ();
 	if (uaddr == NULL || !(is_user_vaddr(uaddr)) || pml4_get_page(curr->pml4, uaddr) == NULL)
 		exit(-1);
+}
+
+//! ADD: check_address
+struct page * check_address2(void *addr){
+    if (is_kernel_vaddr(addr))
+    {
+        exit(-1);
+    }
+    return spt_find_page(&thread_current()->spt, addr);
+}
+
+// //! ADD: check_valid_buffer
+void check_valid_buffer(void* buffer, unsigned size, void* rsp, bool to_write)
+{
+    /* 인자로받은buffer부터buffer + size까지의크기가한페이지의크기를넘을수도있음*/
+    /*check_address를이용해서주소의유저영역여부를검사함과동시에vm_entry구조체를얻음*/
+    /* 해당주소에대한vm_entry존재여부와vm_entry의writable멤버가true인지검사*/
+    /* 위내용을buffer부터buffer + size까지의주소에포함되는vm_entry들에대해적용*/
+    for (int i = 0; i < size; i++)
+    {
+        struct page* page = check_address2(buffer + i);
+        if(page == NULL)
+            exit(-1);
+        if(to_write == true && page->writable == false)
+            exit(-1);
+    }
 }
 
 /* PintOS를 종료한다. */
@@ -218,7 +264,7 @@ int filesize (int fd)
 
 int read (int fd, void *buffer, unsigned size)
 {
-	check_address(buffer);  /* page fault를 피하기 위해 */
+	// check_address(buffer);  /* page fault를 피하기 위해 */
 	int ret;
 	struct thread *curr = thread_current ();
 
@@ -257,7 +303,7 @@ int read (int fd, void *buffer, unsigned size)
 
 int write (int fd, const void *buffer, unsigned size)
 {
-	check_address(buffer);  /* page fault를 피하기 위해 */
+	// check_address(buffer);  /* page fault를 피하기 위해 */
 	int ret;
 	struct thread *curr = thread_current ();
 
@@ -401,4 +447,28 @@ void process_close_file (int fd)
 		return ;
 	
 	curr->fdTable[fd] = NULL;
+}
+
+static void*
+mmap (void *addr, size_t length, int writable, int fd, off_t offset){
+	//Handle all parameter error and pass it to do_mmap
+	if (addr == 0 || (!is_user_vaddr(addr))) return NULL; // addr != 0
+	if ((uint64_t)addr % PGSIZE != 0) return NULL; // page-aligned. page fault 시 자름
+	if (offset % PGSIZE != 0) return NULL; 
+	if ((uint64_t)addr + length == 0) return NULL; // ???
+	if (!is_user_vaddr((uint64_t)addr + length)) return NULL; // 없어도 됨
+	for (uint64_t i = (uint64_t) addr; i < (uint64_t) addr + length; i += PGSIZE){
+		if (spt_find_page (&thread_current() -> spt, (void*) i)!=NULL) return NULL; // NULL이 나와야 함. va를 가진 hash elem이 없어야 NULL
+	}
+	struct file* file = process_get_file (fd);
+	if (file == NULL) return NULL;
+	if (file == 1 || file == 2) return NULL;
+	if (length == 0) return NULL;
+	// struct file* file = tf->file;
+	return do_mmap(addr, length, writable, file, offset);
+}
+
+static void
+munmap (void* addr){
+	do_munmap(addr);
 }

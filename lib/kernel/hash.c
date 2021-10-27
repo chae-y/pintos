@@ -87,7 +87,7 @@ hash_destroy (struct hash *h, hash_action_func *destructor) {
    If an equal element is already in the table, returns it
    without inserting NEW. */
 struct hash_elem *
-hash_insert (struct hash *h, struct hash_elem *new) {
+hash_insert (struct hash *h, struct hash_elem *new) { // h : spt -> table
 	struct list *bucket = find_bucket (h, new);
 	struct hash_elem *old = find_elem (h, bucket, new);
 

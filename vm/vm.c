@@ -7,8 +7,9 @@
 #include "lib/kernel/hash.h"
 #include "threads/vaddr.h" // pg_round_down() 
 #include "userprog/process.h"
-
+#include <string.h>
 #include "vm/file.h"
+#include "threads/mmu.h"
 
 struct list frame_table;
 static struct list frame_list;
@@ -63,6 +64,9 @@ static uint64_t page_hash (const struct hash_elem *p_, void *aux UNUSED);
 static bool page_less (const struct hash_elem *a_,
            const struct hash_elem *b_, void *aux UNUSED);
 
+static struct list_elem *list_next_cycle (struct list *lst,
+    struct list_elem *elem);
+
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
@@ -73,7 +77,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 	bool writable_aux = writable;
 
-	/* Check wheter the upage is already occupied or not. */
+	/* Check whether the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
 		/* Create the page, fetch the initialier according to the VM type,
 		 * and then create "uninit" page struct by calling uninit_new. You
@@ -86,7 +90,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 			uninit_new (page, upage, init, type, aux, anon_initializer);
 		}
 		else if (VM_TYPE(type) == VM_FILE){
-			uninit_new (page, upage, init, type, aux, file_map_initializer);
+			uninit_new (page, upage, init, type, aux, file_backed_initializer);
 		}
 
 		page -> writable = writable_aux;
@@ -142,6 +146,17 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 	return;
 }
 
+static struct list_elem *
+list_next_cycle (struct list *lst, struct list_elem *elem){
+	struct list_elem *cand_elem = elem;
+	if (cand_elem == list_back (lst))
+	// Repeat from the front
+		cand_elem = list_front(lst);
+	else
+		cand_elem = list_next(cand_elem);
+	return cand_elem;
+}
+
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
@@ -156,7 +171,7 @@ vm_get_victim (void) {
 	      cand_elem = list_front (&frame_list);
 	while (cand_elem != NULL) {
 	      // Check frame accessed
-	      candidate = list_entry (cand_elem, struct frame, elem);
+	      candidate = list_entry (cand_elem, struct frame, frame_elem);
 	      if (!pml4_is_accessed (curr->pml4, candidate->page->va)) // 참조 비트 0인걸 찾음 = victim
 		    break; // Found!
 	      pml4_set_accessed (curr->pml4, candidate->page->va, false); // 참조 비트 1->0
@@ -220,7 +235,7 @@ vm_stack_growth (void *addr UNUSED) {
 	void *growing_stack_bottom = stack_bottom;
 	while ((uintptr_t) growing_stack_bottom < USER_STACK &&
 		vm_alloc_page (VM_ANON | VM_MARKER_0, growing_stack_bottom, true)) { // VM_MARKER_0 스탐은 STACK으로 함
-		growing_stack_bottom += PGSIZE;
+		growing_stack_bottom += PGSIZE; // 왜 + 인가
 	};
 	vm_claim_page(stack_bottom); // Lazy load requested stack page only
 
@@ -246,7 +261,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *fault_addr,
 	if(is_kernel_vaddr (fault_addr) && user) return false;
 	/* TODO: Your code goes here */
 	void *stack_bottom = pg_round_down (curr->saved_sp);
-	if(write && (stack_bottom - PGSIZE <= fault_addr &&
+	if(write && (stack_bottom - PGSIZE <= fault_addr && // PGSIZE 왜 뺌??
 		(uintptr_t) fault_addr < USER_STACK)){
 		vm_stack_growth (fault_addr);
 		return true;

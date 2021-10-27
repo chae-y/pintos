@@ -120,7 +120,7 @@ struct thread
 	struct semaphore fork_sema;	 // parent wait (process_wait) until child fork completes (__do_fork)
 	struct semaphore free_sema;	 // Postpone child termination (process_exit) until parent receives its exit_status in 'wait' (process_wait)
 	// 2-4 file descripter
-	struct file **fdTable; // allocation in threac_create (thread.c)
+	struct file **fdTable; // allocation in thread_create (thread.c)
 	int fdIdx;			   // an index of an open spot in fdTable
 	// 2-5 deny exec writes
 	struct file *running; // executable ran by current process (process.c load, process_exit)
@@ -152,6 +152,17 @@ struct thread
 	/* Owned by thread.c. */
 	struct intr_frame tf; /* Information for switching */
 	unsigned magic;		  /* Detects stack overflow. */
+};
+
+struct thread_file {
+	struct file* file;
+	int fd;
+	struct list_elem elem;
+	//for dup2, default -1
+	int dup_tag;
+	int dup_cnt;
+	//for stdin and stdout
+	int std;
 };
 
 /* If false (default), use round-robin scheduler.

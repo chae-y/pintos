@@ -204,13 +204,13 @@ tid_t thread_create(const char *name, int priority,
 	init_thread (t, name, priority);
 
 	/* file descriptor member init */
-	t->fdTable = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+	t->fdTable = palloc_get_multiple(PAL_ZERO, FDT_PAGES); // 연속 free pages 반환
 	if (t->fdTable == NULL)
 		return TID_ERROR;
 	t->fdIdx = 2;
 
-	t->fdTable[0] = 1;
-	t->fdTable[1] = 2;  // 왜 1, 2일까?? 그저 dummy_value??
+	t->fdTable[0] = 1; // stdin
+	t->fdTable[1] = 2;  // stdout. 왜 1, 2일까?? 그저 dummy_value??
 	t->stdin_count = 1;
 	t->stdout_count = 1;
 

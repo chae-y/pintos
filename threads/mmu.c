@@ -282,9 +282,9 @@ pml4_set_dirty (uint64_t *pml4, const void *vpage, bool dirty) {
 		if (dirty)
 			*pte |= PTE_D;
 		else
-			*pte &= ~(uint32_t) PTE_D;
+			*pte &= ~(uint32_t) PTE_D; // 1 dirty, 0 not dirty
 
-		if (rcr3 () == vtop (pml4))
+		if (rcr3 () == vtop (pml4)) // 
 			invlpg ((uint64_t) vpage);
 	}
 }

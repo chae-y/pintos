@@ -33,7 +33,7 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 		.operations = &uninit_ops,
 		.va = va,
 		.frame = NULL, /* no frame for now */
-		.uninit = (struct uninit_page) {
+		.uninit = (struct uninit_page) { // 이 page는 uninit이면서 추후 'type'으로 변함
 			.init = init,
 			.type = type,
 			.aux = aux,
@@ -43,6 +43,7 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 }
 
 /* Initalize the page on first fault */
+// page fault시 호출되고
 static bool
 uninit_initialize (struct page *page, void *kva) {
 	struct uninit_page *uninit = &page->uninit;
