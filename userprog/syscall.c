@@ -14,6 +14,7 @@
 #include <syscall-nr.h>
 #include "intrinsic.h"
 #include "vm/vm.h"
+#include "filesys/directory.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -37,8 +38,15 @@ void close (int fd);
 
 int dup2(int oldfd, int newfd);
 
-static void* mmap (void *addr, size_t length, int writable, int fd, off_t offset);
-static void munmap (void* addr);
+void* mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap (void* addr);
+
+bool chdir (const char* name);
+bool mkdir (const char* name);
+bool readdir (int fd, char* name);
+bool isdir (int fd);
+int inumber (int fd);
+int symlink (const char* target, const char* linkpath);
 
 int process_add_file (struct file *);
 struct file *process_get_file (int);
@@ -141,9 +149,26 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	case SYS_MUNMAP:
 		munmap ((void*) f->R.rdi);
 		break;
-	// default:
-	// 	exit(-1);
-	// 	break;
+	//project 4 - SASL
+	case SYS_CHDIR:
+		f->R.rax = chdir((const char*) f->R.rdi);
+		break;
+	case SYS_MKDIR:
+		f->R.rax = mkdir((const char*) f->R.rdi);
+		break;
+	case SYS_READDIR:
+		f->R.rax = readdir((int) f->R.rdi, (char*) f->R.rsi);
+		break;
+	case SYS_ISDIR:
+		f->R.rax = isdir((int) f->R.rdi);
+		break;
+	case SYS_INUMBER:
+		f->R.rax = inumber((int) f->R.rdi);
+		break;
+	case SYS_SYMLINK:
+		f->R.rax = symlink((const char*) f->R.rdi, (const char*) f->R.rsi);
+		break;
+
 	NOT_REACHED();
 	}
 }
@@ -466,4 +491,93 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 static void
 munmap (void* addr){
 	do_munmap(addr);
+}
+
+/*프로세스의 현재 작업 디렉터리를 상대 또는 절대 디렉터리로 변경합니다. 
+성공하면 true를, 실패하면 false를 반환합니다.*/
+bool chdir (const char* name){
+	if(name == NULL)	return false;
+
+	char *cp_name = (char *)malloc(strlen(name) + 1);
+    strlcpy(cp_name, name, strlen(name) + 1);
+
+	struct dir *chdir = NULL;
+
+	if(cp_name[0] == '/'){
+		chdir = dir_open_root();
+	}else{
+		chdir = dir_reopen(thread_current()->cur_dir);
+	}
+
+	char *token, *nextToken, *savePtr;
+	token = strtok_r(cp_name, "/", &savePtr);
+
+	struct inode *inode = NULL;
+	while(token!=NULL){
+		//token이름 검색해서 없으면 false
+		if(!dir_lookup(chdir, token, &inode)){
+			dir_close(chdir);
+			return false;
+		}
+
+		//위에랑 중복 같음
+		// /* inode가파일일경우NULL 반환*/
+        // if (!inode_is_dir(inode))
+        // {
+        //     dir_close(chdir);
+        //     return false;
+        // }
+
+		//dir 디렉터리정보를 메모리에서 해지 잘 모르겠어^^
+		dir_close(chdir);
+
+		//inode 정보 저장
+        chdir = dir_open(inode);
+
+        token = strtok_r(NULL, "/", &savePtr);
+	}
+	//현재 작업 디렉터리 변경
+    dir_close(thread_current()->cur_dir);
+    thread_current()->cur_dir = chdir;
+    free(cp_name);
+    return true;
+}
+
+/*상대 또는 절대 디렉터리인 dir이라는 디렉터리를 만듭니다. 
+성공하면 true를, 실패하면 false를 반환합니다. 
+dir이 이미 존재하거나 dir의 마지막 이름 외에 디렉토리 이름이 이미 존재하지 않는 경우 실패합니다.
+즉, mkdir("/a/b/c")은 /a/b가 이미 있고 /a/b/c가 없는 경우에만 성공합니다.*/
+bool mkdir (const char* name){
+	lock_acquire(&filesys_lock);
+    bool tmp = filesys_create_dir(name);
+    lock_release(&filesys_lock);
+    return tmp;
+}
+
+/*디렉토리를 나타내야 하는 파일 설명자 fd에서 디렉토리 항목을 읽습니다. 
+성공하면 READDIR_MAX_LEN + 1바이트를 위한 공간이 있어야 하는 이름에 null로 끝나는 파일 이름을 저장하고 true를 반환합니다. 
+디렉토리에 항목이 남아 있지 않으면 false를 반환합니다.
+
+. 그리고 ..는 readdir에 의해 반환되어서는 안됩니다. 
+디렉토리가 열려 있는 동안 변경되면 일부 항목이 전혀 읽히지 않거나 여러 번 읽는 것이 허용됩니다. 
+그렇지 않으면 각 디렉토리 항목을 순서에 관계없이 한 번만 읽어야 합니다.
+
+READDIR_MAX_LEN은 lib/user/syscall.h에 정의되어 있습니다. 
+파일 시스템이 기본 파일 시스템보다 긴 파일 이름을 지원하는 경우 이 값을 기본값인 14에서 늘려야 합니다.*/
+bool readdir (int fd, char* name){
+
+}
+
+/*fd가 디렉토리를 나타내는 경우 true를 반환하고 일반 파일을 나타내는 경우 false를 반환합니다.*/
+bool isdir (int fd){
+
+}
+
+/*일반 파일이나 디렉토리를 나타낼 수 있는 fd와 관련된 inode의 inode 번호를 반환합니다.
+
+inode 번호는 파일이나 디렉토리를 지속적으로 식별합니다. 
+파일이 존재하는 동안 고유합니다. 
+Pintos에서 inode의 섹터 번호는 inode 번호로 사용하기에 적합합니다.*/
+int inumber (int fd){
+
 }

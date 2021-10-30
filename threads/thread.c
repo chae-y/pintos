@@ -126,6 +126,12 @@ void thread_init(void)
 		initial_thread->nice = 0;
 		initial_thread->priority = PRI_MAX;
 	}
+
+	//project 4-SASL
+	#ifdef EFILESYS
+    initial_thread->cur_dir = NULL;
+	lock_init(&filesys_lock); //안되면 syscall에서 init 하기 여기서 해도 될 거 같아서 여기서 함
+    #endif
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -217,6 +223,15 @@ tid_t thread_create(const char *name, int priority,
 
 
 	tid = t->tid = allocate_tid ();
+
+	#ifdef EFILESYS
+
+    if(thread_current()->cur_dir != NULL)
+    {
+        t->cur_dir = dir_reopen(thread_current()->cur_dir); //! ADD : 자식 디렉토리를 부모로
+    }
+
+    #endif
 
 	/* syscall -> 부모의 child-list에 child t 추가 */
 	struct thread *curr = thread_current ();
