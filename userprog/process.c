@@ -27,6 +27,7 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
+struct lock filesys_lock;
 
 /* General process initializer for initd and other process. */
 static void
@@ -472,7 +473,9 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 	/* Open executable file. */
+	lock_acquire(&filesys_lock);
 	file = filesys_open (argv[0]);
+	lock_release(&filesys_lock);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", argv[0]);
 		goto done;

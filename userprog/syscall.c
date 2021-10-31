@@ -202,7 +202,10 @@ void exit(int status)
 bool create(const char *file, unsigned initial_size)
 {
 	check_address (file);
-	return filesys_create(file, initial_size);
+	lock_acquire (&filesys_lock);
+	bool result = filesys_create(file, initial_size);
+	lock_release (&filesys_lock);
+	return result;
 }
 
 bool remove(const char *file)
@@ -240,8 +243,9 @@ int open (const char *file)
 {
 	// file이 존재하는지 항상 체크
 	check_address(file);
+	lock_acquire (&filesys_lock);
 	struct file *file_obj = filesys_open(file);
-
+	lock_release (&filesys_lock);
 	if (file_obj == NULL)
 		return -1;
 	
@@ -249,7 +253,6 @@ int open (const char *file)
 
 	if (fd == -1)
 		file_close(file_obj);
-	
 	return fd;
 }
 
