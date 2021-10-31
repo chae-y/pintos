@@ -15,6 +15,7 @@
 #include "intrinsic.h"
 #include "vm/vm.h"
 #include "filesys/directory.h"
+#include "filesys/inode.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -520,7 +521,7 @@ bool chdir (const char* name){
 			return false;
 		}
 
-		//위에랑 중복 같음
+		//위에랑 중복 같음 - chae
 		// /* inode가파일일경우NULL 반환*/
         // if (!inode_is_dir(inode))
         // {
@@ -565,12 +566,36 @@ bool mkdir (const char* name){
 READDIR_MAX_LEN은 lib/user/syscall.h에 정의되어 있습니다. 
 파일 시스템이 기본 파일 시스템보다 긴 파일 이름을 지원하는 경우 이 값을 기본값인 14에서 늘려야 합니다.*/
 bool readdir (int fd, char* name){
+	if (name == NULL)
+        return false;
 
+    /* fd리스트에서fd에대한file정보를얻어옴*/
+    struct file *target = process_get_file(fd);
+    if (target == NULL)
+        return false;
+
+    /* fd의file->inode가디렉터리인지검사*/
+    if (!inode_is_dir(file_get_inode(target)))
+        return false;
+
+    /* p_file을dir자료구조로포인팅*/
+    struct dir *p_file = target;
+    if(p_file->pos == 0)
+        dir_seek(p_file, 2 * sizeof(struct dir_entry)); //! ".", ".." 제외
+
+    /* 디렉터리의엔트에서“.”,”..” 이름을제외한파일이름을name에저장*/
+    bool result = dir_readdir(p_file, name);
+	
+    return result;
 }
 
 /*fd가 디렉토리를 나타내는 경우 true를 반환하고 일반 파일을 나타내는 경우 false를 반환합니다.*/
 bool isdir (int fd){
+	struct file *target = process_get_file(fd);
+    if (target == NULL)
+        return false;
 
+    return inode_is_dir(file_get_inode(target));
 }
 
 /*일반 파일이나 디렉토리를 나타낼 수 있는 fd와 관련된 inode의 inode 번호를 반환합니다.
@@ -579,5 +604,38 @@ inode 번호는 파일이나 디렉토리를 지속적으로 식별합니다.
 파일이 존재하는 동안 고유합니다. 
 Pintos에서 inode의 섹터 번호는 inode 번호로 사용하기에 적합합니다.*/
 int inumber (int fd){
+	struct file *target = process_get_file(fd);
+    if (target == NULL)
+        return false;
 
+    return inode_get_inumber(file_get_inode(target));
+}
+
+/*문자열 target을 포함하는 linkpath라는 심볼릭 링크를 만듭니다. 
+성공하면 0이 반환됩니다. 그렇지 않으면 -1이 반환됩니다.*/
+int symlink (const char *target, const char *linkpath){
+    //! SOFT LINK
+    bool success = false;
+    char* cp_link = (char *)malloc(strlen(linkpath) + 1);
+    strlcpy(cp_link, linkpath, strlen(linkpath) + 1);
+
+    /* cp_name의경로분석*/
+    char* file_link = (char *)malloc(strlen(cp_link) + 1);
+    struct dir* dir = parse_path(cp_link, file_link);
+
+    cluster_t inode_cluster = fat_create_chain(0);
+
+    //! link file 전용 inode 생성 및 directory에 추가
+    success = (dir != NULL
+               && link_inode_create(inode_cluster, target)
+               && dir_add(dir, file_link, inode_cluster));
+
+    if (!success && inode_cluster != 0)
+        fat_remove_chain(inode_cluster, 0);
+    
+    dir_close(dir);
+    free(cp_link);
+    free(file_link);
+
+    return success - 1;
 }

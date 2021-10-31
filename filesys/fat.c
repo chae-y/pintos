@@ -192,7 +192,7 @@ fat_create_chain (cluster_t clst) {
 	}
 	fat_put (testing, EOChain); // 마지막 표시 end of chain
 
-	while(true){//내가 바꿈
+	while(true){//내가 바꿈-chae
 		if(fat_get(++testing)==0){
 			lock_acquire (&fat_fs->write_lock);
 			fat_fs->last_clst = testing + 1; //왜 보호되어야하는거지...

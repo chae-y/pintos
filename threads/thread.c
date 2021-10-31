@@ -130,7 +130,7 @@ void thread_init(void)
 	//project 4-SASL
 	#ifdef EFILESYS
     initial_thread->cur_dir = NULL;
-	lock_init(&filesys_lock); //안되면 syscall에서 init 하기 여기서 해도 될 거 같아서 여기서 함
+	lock_init(&filesys_lock); //안되면 syscall에서 init 하기 여기서 해도 될 거 같아서 여기서 함 -chae
     #endif
 }
 

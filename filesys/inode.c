@@ -17,6 +17,11 @@ struct inode_disk {
 	off_t length;                       /* File size in bytes. */
 	unsigned magic;                     /* Magic number. */
 	uint32_t unused[125];               /* Not used. */
+
+    uint32_t is_dir;    /* 디렉토리 구분 */
+    uint32_t is_link;   /* symlink 구분 */
+
+	char link_name[492]; 
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -310,4 +315,56 @@ inode_allow_write (struct inode *inode) {
 off_t
 inode_length (const struct inode *inode) {
 	return inode->data.length;
+}
+
+bool inode_is_dir(const struct inode* inode) {
+    bool result;
+
+    /* inode_disk자료구조를메모리에할당*/
+    struct inode_disk *disk_inode = calloc (1, sizeof *disk_inode);
+
+    /* in-memory inode의on-disk inode를읽어inode_disk에저장*/
+    disk_read(filesys_disk, cluster_to_sector(inode->sector), disk_inode);
+
+    /* on-disk inode의is_dir을result에저장하여반환*/
+    result = disk_inode->is_dir;
+    free(disk_inode);
+
+    return result;
+}
+
+bool
+link_inode_create (disk_sector_t sector, char* path_name) {
+
+	struct inode_disk *disk_inode = NULL;
+	bool success = false;
+
+	ASSERT (strlen(path_name) >= 0);
+
+	/* If this assertion fails, the inode structure is not exactly
+	 * one sector in size, and you should fix that. */
+	ASSERT (sizeof *disk_inode == DISK_SECTOR_SIZE);
+
+	disk_inode = calloc (1, sizeof *disk_inode);
+	if (disk_inode != NULL) {
+		disk_inode->length = strlen(path_name) + 1;
+		disk_inode->magic = INODE_MAGIC;
+
+        //! link file 여부 추가
+        disk_inode->is_dir = 0;
+        disk_inode->is_link = 1;
+
+        strlcpy(disk_inode->link_name, path_name, strlen(path_name) + 1);
+
+        cluster_t cluster = fat_create_chain(0);
+        if(cluster)
+        {
+            disk_inode->start = cluster;
+            disk_write (filesys_disk, cluster_to_sector(sector), disk_inode);
+            success = true;
+        }
+
+		free (disk_inode);
+	}
+	return success;
 }
