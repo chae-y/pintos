@@ -57,7 +57,7 @@ struct page {
 	union {
 		struct uninit_page uninit;
 		struct anon_page anon;
-		struct file_page file;
+		// struct file_page file;
 #ifdef EFILESYS
 		struct page_cache page_cache;
 #endif

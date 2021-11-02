@@ -132,7 +132,7 @@ struct thread
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem; // used to put thread into 'ready_list' or sync blocked_list
 
-	
+	struct dir* cur_dir;
 
 
 #ifdef USERPROG

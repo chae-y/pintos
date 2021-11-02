@@ -126,6 +126,10 @@ void thread_init(void)
 		initial_thread->nice = 0;
 		initial_thread->priority = PRI_MAX;
 	}
+	// TODO : for Project 4
+    #ifdef EFILESYS
+    initial_thread->cur_dir = NULL;
+    #endif
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -202,6 +206,15 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Initialize thread. */
 	init_thread (t, name, priority);
+
+	#ifdef EFILESYS
+
+    if(thread_current()->cur_dir != NULL)
+    {
+        t->cur_dir = dir_reopen(thread_current()->cur_dir); //! ADD : 자식 디렉토리를 부모로
+    }
+
+    #endif
 
 	/* file descriptor member init */
 	t->fdTable = palloc_get_multiple(PAL_ZERO, FDT_PAGES); // 연속 free pages 반환

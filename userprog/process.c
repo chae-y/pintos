@@ -344,6 +344,11 @@ process_exit (void) {
 
 	sema_up(&cur->wait_sema);
 	sema_down(&cur->free_sema);
+	#ifdef EFILESYS
+
+    dir_close(thread_current()->cur_dir); //! ADD : open_cnt가 0일때만 inode까지 free
+    
+    #endif
 	
 }
 
@@ -619,7 +624,7 @@ validate_segment (const struct Phdr *phdr, struct file *file) {
  * outside of #ifndef macro. */
 
 /* load() helpers. */
-static bool install_page (void *upage, void *kpage, bool writable);
+// static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Loads a segment starting at offset OFS in FILE at address
  * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
@@ -703,7 +708,7 @@ setup_stack (struct intr_frame *if_) {
  * with palloc_get_page().
  * Returns true on success, false if UPAGE is already mapped or
  * if memory allocation fails. */
-static bool
+ bool
 install_page (void *upage, void *kpage, bool writable) {
 	struct thread *t = thread_current ();
 

@@ -5,19 +5,20 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "filesys/off_t.h"
 
-/* A directory. */
-struct dir {
-	struct inode *inode;                /* Backing store. */
-	off_t pos;                          /* Current position. */
-};
+// /* A directory. */
+// struct dir {
+// 	struct inode *inode;                /* Backing store. */ //
+// 	off_t pos;                          /* Current position. */
+// };
 
-/* A single directory entry. */
-struct dir_entry {
-	disk_sector_t inode_sector;         /* Sector number of header. */
-	char name[NAME_MAX + 1];            /* Null terminated file name. */
-	bool in_use;                        /* In use or free? */
-};
+// /* A single directory entry. */
+// struct dir_entry {
+// 	disk_sector_t inode_sector;         /* Sector number of header. */
+// 	char name[NAME_MAX + 1];            /* Null terminated file name. */
+// 	bool in_use;                        /* In use or free? */
+// };
 
 /* Creates a directory with space for ENTRY_CNT entries in the
  * given SECTOR.  Returns true if successful, false on failure. */
@@ -86,14 +87,14 @@ lookup (const struct dir *dir, const char *name,
 	ASSERT (name != NULL);
 
 	for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-			ofs += sizeof e)
+			ofs += sizeof e){
 		if (e.in_use && !strcmp (name, e.name)) {
 			if (ep != NULL)
 				*ep = e;
 			if (ofsp != NULL)
 				*ofsp = ofs;
 			return true;
-		}
+		}}
 	return false;
 }
 
@@ -135,6 +136,7 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector) {
 	/* Check NAME for validity. */
 	if (*name == '\0' || strlen (name) > NAME_MAX)
 		return false;
+		
 
 	/* Check that NAME is not in use. */
 	if (lookup (dir, name, NULL, NULL))
@@ -213,4 +215,12 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 		}
 	}
 	return false;
+}
+
+//! ADD : 디렉토리 포지션 변경 */
+void
+dir_seek (struct dir *dir, off_t new_pos) {
+	ASSERT (dir != NULL);
+	ASSERT (new_pos >= 0);
+	dir->pos = new_pos;
 }
